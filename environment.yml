@@ -1,0 +1,9 @@
+name: feedingrobot
+channels:
+  - defaults
+dependencies:
+  - python=3.12.14
+  - pip
+  - pip:
+      - -r requirements.lock.txt
+      - -e .

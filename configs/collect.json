@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "teacher": {
+    "scoop_yaw_rad": 0.0,
+    "scoop_pitch_rad": 0.02,
+    "scoop_start_offset_m": 0.045,
+    "scoop_height_m": 0.0138,
+    "scoop_travel_m": 0.08,
+    "lift_height_m": 0.12,
+    "linear_speed_m_s": 0.025,
+    "angular_speed_rad_s": 0.3,
+    "position_gain": 3.0,
+    "orientation_gain": 3.0,
+    "waypoint_tolerance_m": 0.001,
+    "wait_offset_m": 0.06,
+    "insert_depth_m": 0.008,
+    "insert_height_m": -0.006,
+    "release_pitch_rad": 0.2,
+    "release_retreat_m": -0.015,
+    "transport_height_m": 0.35,
+    "capture_center_m": 0.01,
+    "transport_pitch_rad": -0.2,
+    "tilt_start_height_m": 0.045,
+    "transport_speed_m_s": 0.05,
+    "early_carry_pitch_rad": -0.08,
+    "pickup_hold_s": 0.2,
+    "approach_height_m": 0.06,
+    "scoop_capture_m": 0.0225
+  },
+  "quotas": {
+    "train": 100,
+    "validation": 15,
+    "test": 15
+  },
+  "max_attempt_multiplier": 3,
+  "seed_bases": {
+    "calibration": 0,
+    "acceptance": 10000,
+    "train": 20000,
+    "validation": 30000,
+    "test": 40000
+  },
+  "scenario_ranges": {
+    "food_mass_kg": [
+      0.0029,
+      0.0031
+    ],
+    "food_friction": [
+      0.14,
+      0.16
+    ],
+    "head_amp_m": [
+      0.005,
+      0.01
+    ],
+    "head_freq_hz": [
+      0.1,
+      0.2
+    ]
+  },
+  "teacher_ranges": {
+    "scoop_pitch_rad": [
+      0.015,
+      0.025
+    ],
+    "scoop_yaw_rad": [
+      -0.01,
+      0.01
+    ],
+    "lift_height_m": [
+      0.115,
+      0.125
+    ]
+  },
+  "scene": {
+    "head_origin_m": [
+      0.67,
+      0.12,
+      0.35
+    ]
+  }
+}

@@ -1,0 +1,1070 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "repository": "https://github.com/google-deepmind/mujoco_menagerie",
+      "commit_sha": "c96a32d28fb5da84da38c1da4d749e7a13212855",
+      "source_path": "franka_emika_panda",
+      "license": "Apache-2.0",
+      "license_path": "assets/third_party/franka_emika_panda/LICENSE",
+      "files": [
+        {
+          "path": "assets/third_party/franka_emika_panda/LICENSE",
+          "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/README.md",
+          "sha256": "e12684556d0154bdf2a9e77e7009ed680cd06ca89904f9e6303050f9fe59300c"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link0.stl",
+          "sha256": "dfc6d94330de8ddb005b311bfdba9f3b8e1aa7c256b71592ee7ff32cb9a9a5aa"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link0_0.obj",
+          "sha256": "6b9f41a4c203540daaeb7a33cc3d0d6c6a32dc8bba187074eeaf97b3e36b3f9c"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link0_1.obj",
+          "sha256": "57673d2ee2a9db2e10c8986ae57c56a7c39c012b60fd26d7d8549553b664a5ed"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link0_10.obj",
+          "sha256": "c9198b9d8534d628d097b0f2b239bb30343353182df098ce0d9db6bc13326848"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link0_11.obj",
+          "sha256": "f0adec78d6677b7799d25121981270e8bfe119b5c18d08a91ee37a54ad75f65c"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link0_2.obj",
+          "sha256": "1ca435a2a87a9608a146a47955724d43dd7ce10fc3dd3018800aa98f8ba86e05"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link0_3.obj",
+          "sha256": "3e9c6334d2b3b47944af3458ee5f20519abc20fe7ee23063bb53405ccab28046"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link0_4.obj",
+          "sha256": "215d25789704936120f119c0bc1cc7f68516dd3f8f1df61457b71acac3873f26"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link0_5.obj",
+          "sha256": "9361b104e93743045107aa5b15fb1a0835ba9c1f355aae71f56403cf6a9c33f6"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link0_7.obj",
+          "sha256": "2dc0b8ebbbc80e4c065d71e195adbc384f673438641fac82b07b801b4d2837cb"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link0_8.obj",
+          "sha256": "3b8c436999db5586b8eb47bed2b0aa7de6993868b2681b4c04246eeac42fdb7a"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link0_9.obj",
+          "sha256": "45178f97d2b5da6bce11f610212c4ef7d08c73db33a4fc38e1b7f66b93d023f5"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link1.obj",
+          "sha256": "51091e776b16babdbe2f3849b5c041f921d1f11dd94ac19a0f1c81abf496fbae"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link1.stl",
+          "sha256": "e41a39a94108fcf56aacff603fc91ec80541f4c1af17b51a0de5617f5566e6d2"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link2.obj",
+          "sha256": "5c9f8e715de52c3eb71b475de35993b3b96081e02abea9f28c414768877fc59b"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link2.stl",
+          "sha256": "370f7605a0fae3529db169ded50f52f171024aa792d4d773bc84197301f6a039"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link3.stl",
+          "sha256": "0a8d638b9349c6c0eefc4e888636ac4838c4b27170f18a51699321118af709c1"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link3_0.obj",
+          "sha256": "ce2da87f51708e11b189249d41401065dabe89a06e251185a06cef4d5ff27178"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link3_1.obj",
+          "sha256": "2880b7753a7173f38fa87ee21da4dfc7fa7be46fbe07bac5aef9e128513cb118"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link3_2.obj",
+          "sha256": "670cff81ae84693769ca4ae658c154cf909d81167e7c8d22b70ea977f2504efa"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link3_3.obj",
+          "sha256": "30ede0c812efd0e0b767d134a4eae0b84e0fa407bb6325a5a555e0569b3a3ffd"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link4.stl",
+          "sha256": "0180ebb5772ec9840cb049750cffb29a9ddc90311752a16ea34757782ef9e48d"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link4_0.obj",
+          "sha256": "443bf6d178177cf347951ecf107ccd10ca444e605e375b67304579e5f948806f"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link4_1.obj",
+          "sha256": "ca935ec7cc8b3f0e86aa079c76b0b3bf593b1e9830bab0fa7131ac51577c74f0"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link4_2.obj",
+          "sha256": "c89caf26d379c35bb9e191ee2d91d09ab29ecc792b48d8bc10b39e5b38222175"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link4_3.obj",
+          "sha256": "1495d17f45bdb230cf58b0beef9da4e8c9cfe76a3d2d38da89017efe5e093136"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link5_0.obj",
+          "sha256": "a3238b8f2af0f2eb66d9fe63dc5d41ac52d5d38507241b5ed10e3cb019ab3e71"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link5_1.obj",
+          "sha256": "9d994bbf83ec241e301b5197a6846da13f2a4a0582edb2c0f76962c5549649d6"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link5_2.obj",
+          "sha256": "83b4ffe9f772cd7fe182e98640650eebc899aaf01842656574b0416c90dd40a4"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link5_collision_0.obj",
+          "sha256": "3e5aa75fb13f193555c3dfb999df91d81df25006a5c3af5338297d78137c129b"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link5_collision_1.obj",
+          "sha256": "87cd8f621071df010f774cbde789282b8463840dfe704f8bdfa2e29be0142e15"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link5_collision_2.obj",
+          "sha256": "823ab6c8f7b1d79e0844fa071d82a03499ff68e34fddb1ba3451032c22736040"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6.stl",
+          "sha256": "20b768e99a0e0440b5754dcca108016434e57937cc356acd9c352ccd3cb27f77"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_0.obj",
+          "sha256": "0504c70ebf1b284ee8faae7dcb896b8830bc672a6552015dd5dbd121fa031fb9"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_1.obj",
+          "sha256": "45f7ca77695198b6d86ec2417ad4e42e6275044f0f96266699ee8e1057757ac1"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_10.obj",
+          "sha256": "365f26c21d10332cab8d8704645cb46930c30b3085956f2d097498c793f24db4"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_11.obj",
+          "sha256": "8ae61e08b3ad064f25bbf03b22e59cc15d65883b5a7ce92711aff29df2493901"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_12.obj",
+          "sha256": "f28d1bfd62b0244ffd19fb35fe9edefdf583d3c9167db944e87185d919e1d021"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_13.obj",
+          "sha256": "0a55fa92dccb261d07200e6565fca4c850fd17f0c1ecf38821c0b97d51796c7d"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_14.obj",
+          "sha256": "750ae3ee4781e62e3a045c662195247b03f6642b05aa93104f08258e5f6eba26"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_15.obj",
+          "sha256": "5999c1c2497a004a7c4bbe034cdf13744f839d85ae7a11b1bc386c48a3e642e6"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_16.obj",
+          "sha256": "551d7a8b37c53e7a152d008b4e36992e5b5abe74a4be18b57ee6319c27def09f"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_2.obj",
+          "sha256": "e54eee4d8232947ee8af65afd5a067e09dac2da6e7e585cb1dccb65496457da0"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_3.obj",
+          "sha256": "d4f6a25ef32fa1fa4734146981994ee760232cb077c80fea6487d78a077c7f27"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_4.obj",
+          "sha256": "be353480fe71d46f7a96f0a3cbb7e112caaf8d88368826f321a36a253c8749b2"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_5.obj",
+          "sha256": "7c87664623c3e1a6cb330db273227a69626dc5e53b4caff1d4ee7911eb3340c6"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_6.obj",
+          "sha256": "8fbc031e0d07b795ebf99115c75223141caaba317cab569159f3d477a7821681"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_7.obj",
+          "sha256": "7dc5ebb799fe281aab27d6e84e7a4efa0a8e42da2369ec83de3ea3f206f62d73"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_8.obj",
+          "sha256": "e3f77381817a341030f9dcc4c4aa7c559f80411b453fd87eb0fefecca82151bf"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link6_9.obj",
+          "sha256": "25a56ea9b02a03b6cb5a81f31c54f54d0185e1a0b3937c37e4289d896e50215a"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link7.stl",
+          "sha256": "92ac6afcf7574c034d3170d8a68e95ac9048ab9d0dd5bbd8311b86e551b9ab1c"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link7_0.obj",
+          "sha256": "04586b0bde011715cfc22072ac72fe0717eb4d4817bcf665987ce6cd88eb2b93"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link7_1.obj",
+          "sha256": "c3f72289f394c9d6749a4a327fb11f05b203c37c95032c92f28019b40ebe7e00"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link7_2.obj",
+          "sha256": "d2faecedb304d0989040d082410378dc949dbbda23bd18c05134f08aae984db5"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link7_3.obj",
+          "sha256": "b62d87c4d4bdb7b281ed341d347c39dad0e50bf36aed8ac11d050073701d5f70"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link7_4.obj",
+          "sha256": "cb78ccb61fd4ad6c7bff4c4d2e6cb41e1964a5a3e1a28e67c0c6202371cfc018"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link7_5.obj",
+          "sha256": "099071d3090b51471ba52f4f90814fd3089f4975d196e4d488117073d0bfe491"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link7_6.obj",
+          "sha256": "99469e2d95ab74ce0292f2f16954c87a8a7dc16652e62e970fe37c94330a81bb"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/assets/link7_7.obj",
+          "sha256": "426c3db8a19373f3dc73d4bec672e948121b2914c10e2e7b9c7ea80643a19e54"
+        },
+        {
+          "path": "assets/third_party/franka_emika_panda/panda.xml",
+          "sha256": "96ad67da03710f17f798c9478fd9e9efdf24a3bf8359f05e456dd9fb158ea273"
+        }
+      ],
+      "modifications": "Upstream reference files unchanged; runtime robot MJCF and rigid tool are adapted separately. UR5e gains use explicit config scale; no gripper actions."
+    },
+    {
+      "repository": "https://github.com/google-deepmind/mujoco_menagerie",
+      "commit_sha": "c96a32d28fb5da84da38c1da4d749e7a13212855",
+      "source_path": "universal_robots_ur5e",
+      "license": "BSD-3-Clause",
+      "license_path": "assets/third_party/universal_robots_ur5e/LICENSE",
+      "files": [
+        {
+          "path": "assets/third_party/universal_robots_ur5e/CHANGELOG.md",
+          "sha256": "ef67f701df8698fb2e1a77a5de5d9a39aa22e7b4b101f68fc311d34e3ace87ed"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/LICENSE",
+          "sha256": "5ec71ccf66c8d03261448f2441a586765b97f2248c860a1ae19689fb1c45cee6"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/README.md",
+          "sha256": "435600d4f00cfdbd7edec4b60f0cd7fbb539f39abaefcd8bb3994beed3b1156a"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/base_0.obj",
+          "sha256": "9a3b21f1524baef6af8a52d7af90b6e94b79f7e3c2b04a0f6581f74d22291b0b"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/base_1.obj",
+          "sha256": "cf7d54691a2c1eeda280955ebd6bd83c2dbecfc46fb53c10198f05d107511b50"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/forearm_0.obj",
+          "sha256": "64c049a55149c2ab355594d52302b53d3e34da3677ceaa1917c427cde7743146"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/forearm_1.obj",
+          "sha256": "a96fe203015cf532b193f414cd01268c7c36795e51a837dd33afd122334f81f2"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/forearm_2.obj",
+          "sha256": "05b436505fc595aeab26675590c2b56b88a65b2d52d6352096fed9f07cb4c4ca"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/forearm_3.obj",
+          "sha256": "fa31af19cfad7a765b62e8a2d5931cb014b88de84195a7850b4e5ee902112e9a"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/shoulder_0.obj",
+          "sha256": "477387a7e7312782a6040484a3c2c2fcee33f40109f419076e31b6f6e1692c68"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/shoulder_1.obj",
+          "sha256": "8537bba02804640ddf6e260f79fe66e895b3229ed3d44298a95e8e027eb5d435"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/shoulder_2.obj",
+          "sha256": "291714518416bb8f0bafbf123867db011ecbf5146a05245ca5893ee8c57d4e21"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/upperarm_0.obj",
+          "sha256": "14143d4f1175a7dbacc8e2f2f98f1cac5a2b2e238cd46cd03654d31f2610eb53"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/upperarm_1.obj",
+          "sha256": "272899e927f4a32b7c25e34560ec70654c0346cc8ed1c616c0555f3f53b32d14"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/upperarm_2.obj",
+          "sha256": "86c05350d60eb0e7e28a81b544267478b7db997baba41cef19088ebbeffecfa1"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/upperarm_3.obj",
+          "sha256": "b257dab441e6fab64ea03b4b87029d8a96554ad1a513cce944d56acba0ad948a"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/wrist1_0.obj",
+          "sha256": "7ef0c59b5c5d56a9902435c9a058b27d2a38c85fe2bae02d00a9284dd1f4d519"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/wrist1_1.obj",
+          "sha256": "ee6d5c562e6becef94109b0543329080d285d1aef521a01ed98e18a5bf1e8684"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/wrist1_2.obj",
+          "sha256": "88c66dc64f15391287147d50add37729a3f41dadd80b1f859cf2cb6d45daf32a"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/wrist2_0.obj",
+          "sha256": "2ac2e2e39d8f7005bc3b3ab26cd61634be2e14930074615da5318b9ee7c569a8"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/wrist2_1.obj",
+          "sha256": "a721d06dc61d3b3a8ec58c035c9e3358ed30d6991a72e077d8abf3c3c203b633"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/wrist2_2.obj",
+          "sha256": "6df4335c8bd5e881fda2c224f770115ffe9ddd0cd321ebe3c0a4a310796f0987"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/assets/wrist3.obj",
+          "sha256": "0e51748f9c93bd66604360a5cf7e2e8a6e754550be64076333ff4fc19ec90c61"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/scene.xml",
+          "sha256": "e877852d40095926ff7db9cfb85e595b550e03da398bd6f6f58885d39038d1b6"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/ur5e.png",
+          "sha256": "90310086f1187fcda94252ff68f8c4f8be97f65bec8f4eea449179b0979da795"
+        },
+        {
+          "path": "assets/third_party/universal_robots_ur5e/ur5e.xml",
+          "sha256": "ffd0a7b336d3c2d27c35a15cc0d4aaa95196769aca190ac8d6522d3318c345a0"
+        }
+      ],
+      "modifications": "Upstream reference files unchanged; runtime robot MJCF and rigid tool are adapted separately. UR5e gains use explicit config scale; no gripper actions."
+    },
+    {
+      "repository": "https://github.com/Minashiki/Feeding-Robot",
+      "commit_sha": "2756d33cb1fc0536e425d29ec7bf0b4f6c7c4f50",
+      "license": null,
+      "license_note": "User-provided project; no top-level license file found. Upstream assets retain their own licenses.",
+      "source_files": [
+        {
+          "path": "assets/robots/panda_torque.xml",
+          "sha256": "5550b90dc6ae1482c043df82f56fc37673663f7b6af3a57b1be8b8b380396dd1"
+        },
+        {
+          "path": "assets/scenes/feeding_p0.xml",
+          "sha256": "f010c12743916bbbb028cd18d83b8cc73a8d1be975208d8422c963722d26fb43"
+        },
+        {
+          "path": "src/feedingrobot/sim/sensors.py",
+          "sha256": "5f15938bf4af4d37bfa401a6e2415f7d5513b4e4498478ac8c2a1434e8f9c54d"
+        }
+      ],
+      "modifications": "Extract shared scene/tool, replace arm torque motors by upstream position PD, remove seven-DOF assumptions, extend wrench transforms with rigid-body compensation. No M2 controller copied. Task/tool render groups made visible by default without changing physical contact masks."
+    },
+    {
+      "repository": null,
+      "commit_sha": null,
+      "source_path": "extract",
+      "license": null,
+      "license_status": "Upstream repository/version/license were not supplied; do not assume the Menagerie license.",
+      "runtime_root": "assets/task/tableware",
+      "active_assets": [
+        "spoon",
+        "plate"
+      ],
+      "inactive_assets": [
+        "bowl"
+      ],
+      "files": [
+        {
+          "path": "assets/task/tableware/bowl/bowl.xml",
+          "sha256": "6ee5b74644ef1ad7421a2a81ebdc9ed8f7ac5ec3377f2324680ec84f04f9a5cc"
+        },
+        {
+          "path": "assets/task/tableware/bowl/meshes/bowl2_exact.obj",
+          "sha256": "849314d57f9ffd72b981f18155647c74fa199dcad59a8f853f39301515d0d9d7"
+        },
+        {
+          "path": "assets/task/tableware/contact_pairs.xml",
+          "sha256": "b8dd1f695f0cd11d4c7d8d45c8eaae7911bd01e388b736e3597a3454352c5403"
+        },
+        {
+          "path": "assets/task/tableware/plate/meshes/plate2_exact.obj",
+          "sha256": "f25840b7e81d1076e2a437c625984ba555cd95f1b8b7f92a313268076a6d77a5"
+        },
+        {
+          "path": "assets/task/tableware/plate/plate.xml",
+          "sha256": "fcb1e6b65c4cf55983e945079609ba5bea1e0b62965d28d753edff7fb9676aa3"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_000.obj",
+          "sha256": "a9d68e5e5b79340a44663316d22aa4e1d699d443e8908fdd158f19d5d6e4251e"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_001.obj",
+          "sha256": "afeb817422a1ef912939fb6da0a041dc3c56feacba758dbd92fe4a50496a5d2c"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_002.obj",
+          "sha256": "bf259280a7341bf04c6bded0f05e0e04cf37b07454efd402f55f90c977706497"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_003.obj",
+          "sha256": "f78c5af734f629cec655a65123f0bd210aa6d80463138aa31c63c332049f8ed4"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_004.obj",
+          "sha256": "832cb30fa6d4ef694e4e8f6c87b47e2afde7c3409eb63e37af7fe58a4387ac88"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_005.obj",
+          "sha256": "4a1d8d648a49764c9db29bf3e285f623d0725e85c0c53d2318e3ae3ec0070897"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_006.obj",
+          "sha256": "2c9d2df7147f410a551140be8b4ed4d645126e5026602d517b00cdd2669b7713"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_007.obj",
+          "sha256": "f7a3b92293b4ded9d4a8585354cb4efc474cb64785599dea08b1c9d6fb521c7d"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_008.obj",
+          "sha256": "9a8b66ddceaa5eea921203ca719459d0cc851f565e913a40088c1a3fef2a051f"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_009.obj",
+          "sha256": "b2cf133e1eda63538b416d425ecf5a3a6cdeda4da2bcdb72cfa0870cef1ba780"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_010.obj",
+          "sha256": "9a2cf6cf5072ed5c53fd136ea47387d0bd732fd7baf22043653887bee7f4a5bd"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_011.obj",
+          "sha256": "b952115e543ba23da0cba8fa4aa5b00c7fe8a1d0ea68459c4974febb897b7b0b"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_012.obj",
+          "sha256": "66b941f263df49c460d73d2221cf418b72dfa9d52eaed91e592299bcf011f76d"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_013.obj",
+          "sha256": "d7f50834a36ae22d21270729696d42da991e4e8249a680a8e70b20021f5d530f"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_014.obj",
+          "sha256": "464196e163f7005e086adc0ce55dac756dc36bdfde28b42be0dfa95ea326fc13"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_015.obj",
+          "sha256": "0d42c757987198334ab2301d1d0885f639371adb2990ea71b43c1f825c7d262b"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_016.obj",
+          "sha256": "91e4ef987a642cbf3f5e1d66d0cba3351f6662511446201ee5f4e15f0999eb07"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_017.obj",
+          "sha256": "6021937afff4b3cfb2a4f32bc9c53cd798386d72bd201e029ac9beb0fa475499"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_018.obj",
+          "sha256": "0fde5065567f3371b2550b0408906410b69e5b0eefa02f0c3eb09875a593808d"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_019.obj",
+          "sha256": "4ade4a1866dd9f8d40ca07fca981c440f6dd9fbdc04ad09f38e7a33b1a9c3b20"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_020.obj",
+          "sha256": "3059a8a99bfc97343883dff0571a275ffe8e73de8a8e6953ca74335a5ee247e9"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_021.obj",
+          "sha256": "104e8359794bde5a2476869357323ce479bd058bb2e749b6b65e668d85fb9e5d"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_022.obj",
+          "sha256": "15342b3cd1757a16158764de04fb49cfc1dcbbcbebe9b0697556758029c7d92f"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_023.obj",
+          "sha256": "c7ddae860a00ca25b432ea30d3d901cac55e89d5aa6f2f974773e4341485c194"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_024.obj",
+          "sha256": "0dfdfec60db4955982d7e437b6a1e399b6125ba15187f013a8dc8ca8a853ffe3"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_025.obj",
+          "sha256": "048a2b3f589b081ed51595ddab9108f96000e2898d6c0a4984ecdc1330ccc293"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_026.obj",
+          "sha256": "d7218913c924e9d5a1a37caa854b09ba2293285012cfdf1f552da7bce6e58a3f"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_027.obj",
+          "sha256": "38f713b7343cacc8167bb2016074ca40ced5c8ac1dc7672fc6410d08b1054a70"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_028.obj",
+          "sha256": "9f428c4992faae58b5e638b4d06aa43d6993fcd60f24be9651a6c90de1c09c2a"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_029.obj",
+          "sha256": "17d7a7845a4bd376744aac32828237fdff51ae78070bad72b0997976d3f369e4"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_030.obj",
+          "sha256": "eacafe5c804f5573e087e187be7f4a616112047ed1e39e759cd049079aa00d87"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_031.obj",
+          "sha256": "de65c927c5671f1927e8578b903a55e4fd0813e658d4c3de0796dcc5c678dd9f"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_032.obj",
+          "sha256": "cf759aca9dd35daa7a02a7baf7a5275ded243feb592a4b21b0f542c79bb36ed8"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_033.obj",
+          "sha256": "44f763f52c5f0bda1cf29c4e7582c99a7386b3588a5555256bda1e43c9f3715f"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_034.obj",
+          "sha256": "ccc9d0793d1d37d02fba464af2dbc3577cde388680256401a91768a5ab586d59"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_035.obj",
+          "sha256": "2492a65fbeeb27eeeaf60f238e952f24a819a3fbfbf26f5f57449d3752cfbae7"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_036.obj",
+          "sha256": "531d1b6e17b6ea838babb152326304087460159dd85df54a732cc8660b85b1e2"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_037.obj",
+          "sha256": "49f440e96b8b9e040607b9c09fff8f3471c640c9a79b84cf5f6de4c22a8e89f7"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_038.obj",
+          "sha256": "6545785817dd285cd23a5dc568aea910f5300a4347b0ece35030ddc56c1044f1"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_039.obj",
+          "sha256": "71e7e037a7d5ac18c1c6e9076cc9957506c58a206611247d355c9e12382250c0"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_040.obj",
+          "sha256": "158c8ab2aaca158affcdf472028dd6bed540a0fc53f57f516e4f6afa8876939d"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_041.obj",
+          "sha256": "8fd6a89fbc113a93fbde0a3e8e0a627e7210fe9a926dca740e7014d42facccb7"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_042.obj",
+          "sha256": "24bd454d298349156ff724d8109ad51baf8812a4b78268057cf10565c3832232"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_043.obj",
+          "sha256": "eac33100b85d500b1043504f22512391e4dca66540cab151d58651c97974c6f8"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_044.obj",
+          "sha256": "79c917206201a48fa84d593f2159ce5f47b7cf73d9d1c6f257948a6d2293b2df"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_045.obj",
+          "sha256": "bf3d59078c7ea04b0d079bff356ca665b7e15a6fa8566c84f8f3602f67c7701b"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_046.obj",
+          "sha256": "4eee6289b53f0c0aacc473d7502a04298e9d59c98863d6f250ddd83c756cb148"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_047.obj",
+          "sha256": "e3cba46253005c4e70974037d498b9fcb1b71290dfe36bcd5d6b6a3103eb3262"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_048.obj",
+          "sha256": "c1cde37ae25eb704c1e22bbd75d8c9cf951e6be6b3e59362f710cd785ee6e819"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_049.obj",
+          "sha256": "bb7008411ca32dc204e3233a0d1c68341c43ae131d31a2cec7e7e9fc36e6d5c6"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_050.obj",
+          "sha256": "dc19ba8e3c298bb4bc7a12bcd3f8c31c7470676652b0a5331b61cbcf8aa4fecb"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_051.obj",
+          "sha256": "024159c427ac9f23f9f79bb3dbe9499b7b2b5438847f185eb3f9e2d7df0603e2"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_052.obj",
+          "sha256": "16d5dca4d38ca48b7333c691f93332bc16f6edd30112ae18e0da7edbea7c8731"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_053.obj",
+          "sha256": "e63cf15bcc0203e05a078ea64bf333859d8251c3d04412394dc9cd8092695fb5"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_054.obj",
+          "sha256": "f8e7e58dca8f8c891ae7255b5daea62a5070aa39578ee28ccd6e1f454d8ace96"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_055.obj",
+          "sha256": "e912c736da408ae9fcca5ff7ab51b094e7b5c25469eface328fd88fd99314014"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_056.obj",
+          "sha256": "b743124e39752b5e553a7e47f7180eed07d9a79b2c05bccf01dad4b6d1ef54ba"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_057.obj",
+          "sha256": "214b2daa5a5c251c3d93df7cfa4afd4cc8f1fea0ebe51e9493dbaab1977bd3f2"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_058.obj",
+          "sha256": "e8b274e2537d6279cafb154e6dd0308b011f9c53f31d13018d4313679e4e098c"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_059.obj",
+          "sha256": "185017a5e791e73f3d8e3b30cae510f30ec86c442e6e6993a965c9324f344ae9"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_060.obj",
+          "sha256": "427ad7215930b15698fda97b33f4ea3e3593c90c8a9e5dbaad24b9041927b761"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_061.obj",
+          "sha256": "bc078a311297fd64230a57fbd153f92c2e2af1d1f61674a607bc60d3885d1de8"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_062.obj",
+          "sha256": "22050ea262d7fcaa19d364d28967af9b0bc2771c1d1943a06a64a3ffe6de34d5"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_063.obj",
+          "sha256": "46aec7c2b871fd09016ff1e2eb9a55f3c16e2d403feac503ff28cc7c0af10d0d"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_064.obj",
+          "sha256": "7e170c34a7cb65283615c6a13d8b24f2672994e7a6a453f9715e088717f0c2a3"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_065.obj",
+          "sha256": "f4d88e692c03e72035d3f43ead572c7a47ce35cc49c2c627e54e1327c7b80759"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_066.obj",
+          "sha256": "54b1b9adc2d0a9bcb8af0843de203579b9c685fa07ee5fbb561ea654fff08aaf"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_067.obj",
+          "sha256": "0b688b54991624b0efd99cb9ee1b01e2e6a3cb2dae58a4e6b957be40c3dcc763"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_068.obj",
+          "sha256": "c5b63b59319c253967b55d017fb55720172d5968718e8263c9085a3a1851d310"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_069.obj",
+          "sha256": "f9e3aecd03f95701c2f5feb5292c6653652b66163abc9f011960d9ac6a009487"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_070.obj",
+          "sha256": "98f5cdff53c87f8a05161628015dfbedafeb1721b7449aa83fc18dbea8d0287e"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_071.obj",
+          "sha256": "2479f466a09b01075c284900161c431c310bcbe6ca48b20bae9f6d690d72737c"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_072.obj",
+          "sha256": "2503168531fc5c74c77634c2fc260b383d9332fead9bd9c68ae76e800ee738ba"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_073.obj",
+          "sha256": "38123097489787c0f6908bcec333fce128284ae4bda7abc676d58358ccf55359"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_074.obj",
+          "sha256": "5fe9f78d746e991da17af9cfbbeca2c99d95989fb16fd3aae9295bdb3eec0c51"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_075.obj",
+          "sha256": "1a661aafd7ccd0767b97f2b8dd50bd6fcec6adcaf16eb7761552c45d5c3dd1fd"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_076.obj",
+          "sha256": "33e9443cf6ff58049045fc766d45539a7acbf3718dbfe055ffc6f429d74e41f8"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_077.obj",
+          "sha256": "1c8c844eea746b70d19fa83577e7fba4b191a0eca9dc81eb92b12d42c7d3d78c"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_078.obj",
+          "sha256": "8d23df5fc715ecee86b0b87a2dcf97815d6855f60d71dc637a0f930ad86d54a2"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_079.obj",
+          "sha256": "657a0bedd4912a5a3e60cd69f2c9d19b6d622f2f833ce6ea8006206336907a45"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_080.obj",
+          "sha256": "84ae8d6f9144989ef8e610c9d033612ba0ce2e31728cfae6dd1b15a22fbe0e3b"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_081.obj",
+          "sha256": "24fb83897c7d299dee31cf2d0519d55e0d76946f201fca80c42e8094e3a5403a"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_082.obj",
+          "sha256": "438b741dd032b12610e23660f0629fa3e290b26b27570ddba62b9587e6aff97b"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_083.obj",
+          "sha256": "83432d18f32709dc941840570abc952984f9346a554198278fa051d34c614070"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_084.obj",
+          "sha256": "bd60d83a131446f477d77aa9f76f818cc038a39bb67d6dbfc41585b30dad3ebd"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_085.obj",
+          "sha256": "f28311172d8b4c4f23366ecea04e7951eb63b47be60665066f4e73ef250440cb"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_086.obj",
+          "sha256": "17c25affcec1138c706432548e1595f13edf67ffd462393fb1ef375d906c09ca"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_087.obj",
+          "sha256": "48bdb025324520da3e6d1317691319e0a9f0feebb8011b6587bc7617f9925901"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_088.obj",
+          "sha256": "87a07638b6c59cd50e810031c9d146ee8d16382da2b73670f895aeedd06afb2a"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_089.obj",
+          "sha256": "e742e7a530d946cacc68e52152ee1bff7e1fa3c550a5ff94428f69710dc53b1e"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_090.obj",
+          "sha256": "8f54e7b929e579a33ae4ce5d0a83ab47f3593eb4ab8b720cd68836b3b5b2d0a9"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_091.obj",
+          "sha256": "96a0f3773f9626f9ce969277d6c7a24c12fca777d6b5dd0d5b9c59fefad99672"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_092.obj",
+          "sha256": "e0836a95d14c41b130b06853856992ed77265b9577628a551de22a4aae2d07db"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_093.obj",
+          "sha256": "78774b79cbd9bb66b335afcba9723edc279193c5c1934530c4a11bfdfe394fcd"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_094.obj",
+          "sha256": "2c935c8b3bc52f584ee132426c205fc23e1fde01af3978e5f9c5341bfeae5cac"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_095.obj",
+          "sha256": "6e865984894815db91b264ed24a3a350c23084433675142ff5ce74fca54a8d3e"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_096.obj",
+          "sha256": "8122003e8c44936c622e5dabf291de6f122d7ef503a734cccefc0a8560c886d3"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_097.obj",
+          "sha256": "3719ba8b12f9d4901fac2e0fc69af8fe201ddd95df8b5926c2cf7386f84a3f3f"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_098.obj",
+          "sha256": "fc71356ac5da3d49acfbd9e27cf3fb9c7a3149ed8ad4aa773d31557033b873e7"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_099.obj",
+          "sha256": "86e0d6ee52bff37bd61a2cddfc1aa5e33b4afd25d8fa2a6338fd20fbf29ef61e"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_100.obj",
+          "sha256": "49d133befd885cb41f612cd93f9739168a940baa3c8b9faf84fe37d607c8e166"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_101.obj",
+          "sha256": "b51abfa55bb6839b17636b7b6f4be2763ee9e4e4f77ed23626c85f85d69e8dc6"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_102.obj",
+          "sha256": "ff97f5aa176e728591f584800dc826672c5c3b24abca46ea2298292848946e7f"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_103.obj",
+          "sha256": "f304e23d6dbb88b50761e9d18be2d4c1772a66a5c3d14ead36c7d026a8240e61"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_104.obj",
+          "sha256": "3dd9204bd322d2d293fb3e2f1a58d5911d7e6bccd915f18d3efce83220c2fac8"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_105.obj",
+          "sha256": "7c8509bcd3b42a8d49653e6d0442609d25768efe7ad30d7c12fad03988289594"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_106.obj",
+          "sha256": "98ca8b66ff0a35f4d0e502f789ce52240b6084df9aa29032626cc26f09940756"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_107.obj",
+          "sha256": "e7777f880088e336b0572be43bad129fafb42d31b7e4c10a3154511f86d395a6"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_108.obj",
+          "sha256": "4b6442584c114ad1cabc450cb75e298d6ba23d225280275801e5c91f507e541a"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_109.obj",
+          "sha256": "9a6b394c9a12b04088dcd640298186952e6c800c259757b6440886835d1d9bd3"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_110.obj",
+          "sha256": "dcfa6978e7ebc8dea6d7d1e659586c47815428cc6b0c05aa9403c9d01741d159"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_111.obj",
+          "sha256": "32465dc497ec6aa944fc5d4f9a7fa03655a473e5c0c553907e77ae1133bc1697"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_112.obj",
+          "sha256": "f42373c57ffcd191f14f7f873199235d6f1713a397c981da1f0373fcd2ff4bdf"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_113.obj",
+          "sha256": "999b7cd3ffe5180ba3e36d9c3fe92c72bfed1868fe78d5f8895eaad5e3f9d2fa"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_114.obj",
+          "sha256": "24c7ef52e576e6774ec8d75abd14ce604452b1444f0f65d2f1bda13348a3300e"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_115.obj",
+          "sha256": "0194122f30969d082dabf14ea40025269bad29907152de0b7cc895bdc42b1704"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_116.obj",
+          "sha256": "c271e05274dea48542ed59d734466b863b80fc8e2e91fdd060ec0a973e468f04"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_117.obj",
+          "sha256": "5a88fed93937bdb6f34fc01320e0773feda9ec26e7025dd8d6459a5cec9a83e6"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_118.obj",
+          "sha256": "f854bfde66d25186593a052ec26b1a5c679b2ebe7b6d05ebc4db831715855de6"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_119.obj",
+          "sha256": "deb708b78c824f3dafb92b99ba626455b03cb47a807c026517b84e808a21fd60"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_120.obj",
+          "sha256": "f999b4c8ce40f5289a8f26c9881dbd5f29030e6b6612de29ce1fef7e025b713b"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_121.obj",
+          "sha256": "de6d135a492d5e6fdb88e0b1af60dd3938d0fb5ee79e5f18652c0a50e8794829"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_122.obj",
+          "sha256": "19f74f1c6c67658bdbfe8619089b93dcb3e0f8e34caabb7153e81e9af5d0f7e0"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_123.obj",
+          "sha256": "112632c1bd25cf1ba0ab9b85f2bdbc235a1ace2cc224d6390df1f8151b755c7b"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_124.obj",
+          "sha256": "7ed819a198ded15a91093149d3918df144de02e7c6256353e92583a0a0a2cf81"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_125.obj",
+          "sha256": "be6ef9acd936f91ab33658da48e453a52d635519c7adef10ce2f5dafd6934fde"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_126.obj",
+          "sha256": "6e139e90e9543f018225bee3f0ce350806f180ad1f6a1c6eabc07b1bb7b553ab"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_127.obj",
+          "sha256": "0aa53fae9d929d8da276d5ac7acf17f01591282616b5cfef870c721a117f2ff0"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_128.obj",
+          "sha256": "3d2a8de12a7dc7dbf3e60cb9d034887e782a2738f3dca7a8e086473693dd3dd4"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/scoop_prisms_coarse/spoon_scoop_coarse_prism_129.obj",
+          "sha256": "1291904aab0373092d3b50b629c7b33a21f27d1ad5ae61184aef6044cc07b9c0"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/spoon_visual.obj",
+          "sha256": "ba3739e41f8e58136d08728d8d291863d206ef76963c519bb5907a2b644df105"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/stem/spoon_stem_00.obj",
+          "sha256": "4e4960957142945896c5b520c2ae120fdaeda4ff375240f772c56e7156240798"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/stem/spoon_stem_01.obj",
+          "sha256": "60c70fadf48d5ffbe813b5f5598948d9928b8e721deaa98b7e1eda5980aa5ae1"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/stem/spoon_stem_02.obj",
+          "sha256": "b053f9f919ffdd8030790fbb1caf45058f5520d00917d745c7b1ef1ccb63fb27"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/stem/spoon_stem_03.obj",
+          "sha256": "7016bcfe5f29d72c3f17f321b84fdf634a3cc3e9b136747b357a90d241d90dba"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/stem/spoon_stem_04.obj",
+          "sha256": "31febbad063c5c11ebaaad8910eaca39e65731336885691f8e47b76b96d9993c"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/stem/spoon_stem_05.obj",
+          "sha256": "c89e43d36fc97e358f4ecf111c2ede3729367a279e6da2c5f5cf80f5d7bc403c"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/stem/spoon_stem_06.obj",
+          "sha256": "db026498fa25446ac1e7d82ed6f3a4a6970d9b770ac9ae0f7b025bb1272723cc"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/stem/spoon_stem_07.obj",
+          "sha256": "2d05437e302a1639d8525f94176b48d5df2b7822237c772aa1dfbab4e863964e"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/stem/spoon_stem_08.obj",
+          "sha256": "240beb65423688be72087742c5f1ecfc95c7b4a7210a508fa670caddeb500690"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/stem/spoon_stem_09.obj",
+          "sha256": "44450ed2f66b96c6022281eed39f0fe71fb8a5bf86c0098d22d6ee3df8faf1f2"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/stem/spoon_stem_10.obj",
+          "sha256": "7f065b5f7dda375a3d3e31d3a1b09dec499b53790d21619d16f644bcaa5bf239"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/stem/spoon_stem_11.obj",
+          "sha256": "55f95a82f2eede006885357cec8e6ac63e63e2e8433c9b79d9f31fc3f81b892e"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/stem/spoon_stem_12.obj",
+          "sha256": "c8a64cf1ca69ee2218e2a9988fb00af92d6babd756e5b20718e4e3232194b689"
+        },
+        {
+          "path": "assets/task/tableware/spoon/meshes/stem/spoon_stem_13.obj",
+          "sha256": "8bac6959d0e8d0b902c00d6aeea6a78a45767aae731205406940c1187f9dfb37"
+        },
+        {
+          "path": "assets/task/tableware/spoon/spoon.xml",
+          "sha256": "60bff07be7a97b57083509c284b015f1544d5923242a20bb9687fbdd7a78ebf5"
+        }
+      ],
+      "modifications": "Source XML/OBJ bytes retained. Assembly removes free joints, scopes defaults/materials, resolves meshes and filters 145 spoon/plate pairs. Rigid transforms and sites are defined by model.py and scene/robot configurations. Runtime never reads extract."
+    }
+  ],
+  "note": "Only runtime assets and selected M1 sensor logic are reused. Old M2 code and reports are not runtime dependencies.",
+  "derived_files": [
+    {
+      "path": "assets/robots/panda.xml",
+      "sha256": "2fbce82a707d9e4be921bb4e26bec4a21c9bd01616b8dddd0204da639ef7b119"
+    },
+    {
+      "path": "assets/robots/ur5e.xml",
+      "sha256": "2c00763cb25d183ea14e06877b5916003c46a77ecf4c2bb343e6549c72855c38"
+    },
+    {
+      "path": "assets/task/scene.xml",
+      "sha256": "fabd429020a824c49a0f853de05d6c21c15d371fd6957b99c65ee4f737c16c85"
+    },
+    {
+      "path": "configs/scene.json",
+      "sha256": "cc06004d0c74d541936d944656573e81ff6a4619161aade687832dfdb79a42af"
+    },
+    {
+      "path": "configs/task.json",
+      "sha256": "bfb3b2a0f8eec88bd6b381b76f4855c5a1cadc7b36c15f84d243b2ec4388e370"
+    },
+    {
+      "path": "configs/acceptance.json",
+      "sha256": "2d47062fb67b71c770748bbbaebcdb23a05265909b0a2d82037ed109f737c438"
+    },
+    {
+      "path": "configs/robots/panda.json",
+      "sha256": "f1f81cb68f8250fdd2e0c4bc7f1bee7a06d8d7f8cf588731cd4c64cc73d8c115"
+    },
+    {
+      "path": "configs/robots/ur5e.json",
+      "sha256": "31f44d7efde295cf4b1fc676e2377a923d0cde6588e8b647806f353a24acb9dd"
+    }
+  ],
+  "python_dependencies": {
+    "direct_requirements": "requirements.txt",
+    "resolved_lock": "requirements.lock.txt",
+    "resolution_report": "outputs/m0/dependency_resolution.json",
+    "runtime_licenses": "docs/licenses",
+    "versions": {
+      "mujoco": "3.14.0",
+      "mink": "1.3.0",
+      "lerobot": "0.6.1",
+      "torch": "2.11.0+cu130",
+      "torchvision": "0.26.0+cu130",
+      "gymnasium": "1.3.0",
+      "stable-baselines3": "2.9.0"
+    }
+  }
+}

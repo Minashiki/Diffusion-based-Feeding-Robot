@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "scope": "M3 P0 simulation criteria; not human safety limits",
+  "control_dt_s": 0.02,
+  "max_episode_s": 60.0,
+  "support_confirm_s": 0.1,
+  "delivery_confirm_s": 0.2,
+  "retract_confirm_s": 0.1,
+  "ready_confirm_s": 0.1,
+  "unsupported_grace_s": 0.1,
+  "penetration_limit_m": 0.003,
+  "penetration_confirm_s": 0.005,
+  "wait_offset_m": 0.06,
+  "position_tolerance_m": 0.01,
+  "orientation_tolerance_rad": 0.1,
+  "clearance_margin_m": 0.002,
+  "spoon_support_min_m": [
+    -0.018435,
+    -0.012777,
+    -0.001
+  ],
+  "spoon_support_max_m": [
+    0.02038,
+    0.012745,
+    0.03
+  ],
+  "plate_clearance_m": 0.002,
+  "contact_min_force_n": 1e-05,
+  "interaction_min_m": [
+    0.0,
+    -0.029,
+    -0.04
+  ],
+  "interaction_max_m": [
+    0.044,
+    0.029,
+    0.019
+  ],
+  "receiver_min_xy_m": [
+    0.0,
+    -0.025
+  ],
+  "receiver_max_xy_m": [
+    0.04,
+    0.025
+  ],
+  "receiver_xy_tolerance_m": 0.0005,
+  "receiver_top_m": 0.015,
+  "receiver_floor_tolerance_m": 0.002,
+  "reward": {
+    "pickup": 10.0,
+    "delivery": 20.0,
+    "success": 50.0,
+    "failure": -50.0,
+    "progress_scale_m": 0.1,
+    "progress_clip_per_step": 1.0,
+    "time_per_s": -0.01,
+    "contact_per_ns": -0.1
+  }
+}

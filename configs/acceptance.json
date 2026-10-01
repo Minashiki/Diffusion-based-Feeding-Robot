@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "scope": "M1 simulation engineering criteria; not human safety limits",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "hold_duration_s": 2.0,
+  "hold_position_error_m": 0.005,
+  "hold_orientation_error_rad": 0.05,
+  "tracking_position_error_m": 0.008,
+  "tracking_orientation_error_rad": 0.07,
+  "stop_settle_s": 0.5,
+  "stop_linear_speed_m_s": 0.005,
+  "stop_angular_speed_rad_s": 0.05,
+  "wrench_force_error_n": 0.02,
+  "wrench_torque_error_nm": 0.002,
+  "reset_count": 100,
+  "reset_atol": 1e-09,
+  "convergence_position_m": 0.002,
+  "convergence_rotation_rad": 0.035,
+  "convergence_force_relative": 0.2,
+  "convergence_force_absolute_n": 0.05,
+  "support_confirm_s": 0.1,
+  "acceleration_diagnostic": {
+    "linear_speed_limit": 1.5,
+    "linear_acceleration_limit": 100.0,
+    "reference_position_limit": 0.15,
+    "joint_velocity_limit": 8.0,
+    "joint_speed_fault_rad_s": 8.0,
+    "note": "Stress diagnostic only: deeper new scoop retained food under the old 0.8 m/s pulse. A lateral 1.5 m/s pulse and fourfold PD stiffness produce inertial ejection; normal gains, force limits and operating protection are unchanged. Report commanded and measured acceleration.",
+    "servo_gain_scale": 4.0
+  },
+  "support_hold_s": 2.0,
+  "support_drift_m": 0.003,
+  "convergence_impulse_absolute_ns": 0.005,
+  "convergence_impulse_relative": 0.2,
+  "reachability_timeout_s": 20.0
+}

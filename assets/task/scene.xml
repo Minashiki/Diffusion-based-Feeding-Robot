@@ -1,0 +1,60 @@
+<mujoco model="feeding p0">
+  <option timestep="0.001" gravity="0 0 -9.81" integrator="implicitfast" solver="Newton" iterations="50" cone="elliptic" impratio="10" />
+  <default>
+    <default class="task">
+      <geom friction="0.5 0.005 0.0001" solref="0.005 1" solimp="0.9 0.95 0.001" condim="3" group="0" />
+    </default>
+    <default class="scene_motor">
+      <motor ctrllimited="true" forcelimited="true" gear="1" />
+    </default>
+  </default>
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0" />
+    <global azimuth="140" elevation="-25" />
+  </visual>
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072" />
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300" />
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2" />
+  </asset>
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true" />
+    <camera name="overview" pos="1.35 -1.05 0.85" xyaxes="0.62 0.78 0 -0.28 0.22 0.93" />
+    <geom name="floor" type="plane" pos="0 0 -0.25" size="0 0 0.05" material="groundplane" class="task" />
+    <geom name="table" type="box" pos="0.55 -0.02 -0.04" size="0.38 0.48 0.02" class="task" rgba="0.45 0.36 0.28 1" />
+    <body name="food" pos="0.45 -0.18 0.03">
+      <freejoint name="food_joint" />
+      <inertial mass="0.003" pos="0 0 0" diaginertia="7.2e-8 7.2e-8 7.2e-8" />
+      <geom name="food_box" type="box" size="0.006 0.006 0.006" mass="0.003" class="task" friction="0.15 0.005 0.0001" rgba="0.85 0.45 0.15 1" />
+    </body>
+    <body name="head" pos="0.55 0.12 0.35">
+      <joint name="head_x" type="slide" axis="1 0 0" range="-0.02 0.02" damping="5" armature="0.01" />
+      <joint name="head_y" type="slide" axis="0 1 0" range="-0.02 0.02" damping="5" armature="0.01" />
+      <joint name="head_z" type="slide" axis="0 0 1" range="-0.02 0.02" damping="5" armature="0.01" />
+      <joint name="head_yaw" type="hinge" axis="0 0 1" range="-0.15 0.15" damping="0.4" armature="0.01" />
+      <inertial mass="1" pos="0.02 0 0" diaginertia="0.02 0.02 0.02" />
+      <geom name="mouth_upper" type="box" pos="0.004 0 0.017" size="0.008 0.029 0.002" class="task" rgba="0.9 0.7 0.7 1" />
+      <geom name="mouth_left" type="box" pos="0.02 0.027 0" size="0.02 0.002 0.019" class="task" rgba="0.9 0.75 0.75 1" />
+      <geom name="mouth_right" type="box" pos="0.02 -0.027 0" size="0.02 0.002 0.019" class="task" rgba="0.9 0.75 0.75 1" />
+      <geom name="mouth_back" type="box" pos="0.042 0 0" size="0.002 0.029 0.019" class="task" rgba="0.85 0.65 0.65 1" />
+      <site name="mouth_entry" pos="0 0 0" size="0.008" rgba="1 0.5 0 1" />
+      <body name="jaw" pos="0 0 -0.015">
+        <joint name="jaw" type="hinge" axis="0 1 0" range="-0.05 0.45" damping="0.05" armature="0.001" />
+        <inertial mass="0.1" pos="0.02 0 -0.004" diaginertia="4e-4 4e-4 4e-4" />
+        <geom name="jaw_floor" type="box" pos="0.02 0 -0.002" size="0.02 0.023 0.002" class="task" rgba="0.8 0.55 0.55 1" />
+        <geom name="jaw_lip" type="box" pos="0.001 0 -0.002" size="0.004 0.025 0.002" class="task" rgba="0.85 0.6 0.6 1" />
+        <site name="mouth_receiver" pos="0.02 0 0" size="0.006" rgba="1 0 0.8 1" />
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor class="scene_motor" name="head_fx" joint="head_x" ctrlrange="-30 30" forcerange="-30 30" />
+    <motor class="scene_motor" name="head_fy" joint="head_y" ctrlrange="-30 30" forcerange="-30 30" />
+    <motor class="scene_motor" name="head_fz" joint="head_z" ctrlrange="-30 30" forcerange="-30 30" />
+    <motor class="scene_motor" name="head_tau_yaw" joint="head_yaw" ctrlrange="-2 2" forcerange="-2 2" />
+    <motor class="scene_motor" name="jaw_tau" joint="jaw" ctrlrange="-0.4 0.4" forcerange="-0.4 0.4" />
+  </actuator>
+  <contact>
+    <exclude body1="head" body2="jaw" />
+  </contact>
+</mujoco>

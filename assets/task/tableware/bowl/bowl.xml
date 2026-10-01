@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mujoco model="bowl">
+  <compiler angle="radian" autolimits="true" />
+  <option integrator="implicitfast" timestep="0.001" gravity="0 0 -9.81" cone="elliptic" impratio="10" solver="Newton" iterations="100" ls_iterations="20">
+    <flag contact="enable" />
+  </option>
+  <default>
+    <geom condim="3" solref="0.008 1" solimp="0.96 0.995 0.001 0.5 2" margin="0" contype="1" conaffinity="7" />
+    <joint damping="2.5" armature="0.002" />
+  </default>
+  <asset>
+    <material name="mat_v2_OmniPBR" rgba="0.135657 0.293414 0.351351 1" />
+    <material name="collision_object_mat" rgba="0 0.55 1.0 0.18" />
+    <mesh name="dynamic_bowl2_mesh" file="meshes/bowl2_exact.obj" inertia="shell" />
+  </asset>
+  <worldbody>
+    <body name="dynamic_bowl2" pos="0 0 0" quat="1 0 0 0">
+      <freejoint name="dynamic_bowl2_freejoint" />
+      <inertial pos="0 0 0" mass="0.28" diaginertia="0.00028 0.00028 0.00036" />
+      <body name="dynamic_bowl2_usd_internal" pos="0.00175075531006 7.43025124097e-05 -0.00673707613806" quat="0.999987763364 0.000318679323933 -0.00489398985442 -0.000648405647195">
+        <geom name="visual_dynamic_bowl2" type="mesh" mesh="dynamic_bowl2_mesh" material="mat_v2_OmniPBR" group="1" contype="0" conaffinity="0" density="0" />
+        <geom name="collision_bowl_fast_bottom_disk" type="cylinder" pos="2.421438694e-08 0 0.0029516933132" size="0.035 0.0022" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_00" type="box" pos="0.0457500242144 0 0.0302016933132" quat="0.974720281 0 0.223428678 0" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_01" type="box" pos="0.0422675128144 0.017507767 0.0302016933132" quat="0.955991304 -0.0435887728 0.219135559 0.190158493" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_02" type="box" pos="0.0323501594144 0.0323501352 0.0302016933132" quat="0.900524117 -0.0855024535 0.206421183 0.373009303" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_03" type="box" pos="0.0175077912144 0.0422674886 0.0302016933132" quat="0.810450294 -0.124130323 0.185774157 0.541525574" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_04" type="box" pos="2.42143869428e-08 0.04575 0.0302016933132" quat="0.68923132 -0.157987934 0.157987934 0.68923132" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_05" type="box" pos="-0.0175077427856 0.0422674886 0.0302016933132" quat="0.541525574 -0.185774157 0.124130323 0.810450294" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_06" type="box" pos="-0.0323501109856 0.0323501352 0.0302016933132" quat="0.373009303 -0.206421183 0.0855024535 0.900524117" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_07" type="box" pos="-0.0422674643856 0.017507767 0.0302016933132" quat="0.190158493 -0.219135559 0.0435887728 0.955991304" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_08" type="box" pos="-0.0457499757856 5.60275911e-18 0.0302016933132" quat="5.96844036e-17 -0.223428678 1.36810608e-17 0.974720281" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_09" type="box" pos="-0.0422674643856 -0.017507767 0.0302016933132" quat="-0.190158493 -0.219135559 -0.0435887728 0.955991304" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_10" type="box" pos="-0.0323501109856 -0.0323501352 0.0302016933132" quat="-0.373009303 -0.206421183 -0.0855024535 0.900524117" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_11" type="box" pos="-0.0175077427856 -0.0422674886 0.0302016933132" quat="-0.541525574 -0.185774157 -0.124130323 0.810450294" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_12" type="box" pos="2.42143869316e-08 -0.04575 0.0302016933132" quat="-0.68923132 -0.157987934 -0.157987934 0.68923132" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_13" type="box" pos="0.0175077912144 -0.0422674886 0.0302016933132" quat="-0.810450294 -0.124130323 -0.185774157 0.541525574" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_14" type="box" pos="0.0323501594144 -0.0323501352 0.0302016933132" quat="-0.900524117 -0.0855024535 -0.206421183 0.373009303" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+        <geom name="collision_bowl_fast_wall_15" type="box" pos="0.0422675128144 -0.017507767 0.0302016933132" quat="-0.955991304 -0.0435887728 -0.219135559 0.190158493" size="0.0027 0.0104202701 0.025828763" condim="3" friction="1.35 0.02 0.002" group="3" contype="1" conaffinity="7" density="0" material="collision_object_mat" rgba="0 0.55 1 0.30" solref="0.009 1" solimp="0.90 0.98 0.001" />
+      </body>
+    </body>
+  </worldbody>
+</mujoco>
