@@ -3,12 +3,13 @@
 import numpy as np
 import pytest
 
-from feedingrobot.scripts.m3_cases import physical_case
+from feedingrobot.scripts.m3_cases import physical_case, PHYSICAL_CASES
+from feedingrobot.scripts.validate_m3 import compare_runs
 from feedingrobot.sim.model import load_json
 
 
 @pytest.mark.parametrize("robot", ["panda", "ur5e"])
-@pytest.mark.parametrize("scenario", ["plate", "carry", "receiver", "unsupported", "force", "penetration"])
+@pytest.mark.parametrize("scenario", PHYSICAL_CASES)
 def test_directed_physics(robot, scenario):
     result, trace = physical_case(robot, scenario)
     assert trace
@@ -35,3 +36,10 @@ def test_physics_timestep_convergence(robot, scenario):
         cfg["impulse_absolute_tolerance_ns"], cfg["impulse_relative_tolerance"] * base["impulse_ns"])
     np.testing.assert_allclose(base["tcp_position"], fine["tcp_position"], rtol=0,
                                atol=cfg["tcp_position_tolerance_m"])
+    assert compare_runs(base, fine, cfg)["passed"]
+
+
+def test_convergence_rejects_changed_event_sequence():
+    base, _ = physical_case("panda", "receiver")
+    changed = dict(base, events=base["events"][:-1])
+    assert not compare_runs(base, changed, load_json("configs/acceptance_m3.json"))["passed"]

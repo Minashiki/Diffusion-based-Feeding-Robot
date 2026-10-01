@@ -1,10 +1,15 @@
 {
   "schema_version": 1,
-  "scope": "M3 directed P0 cases; not full feeding success rates",
+  "scope": "New tableware M3 directed P0 cases, fixed seeds and both timestep/solver comparisons; not full feeding success rates",
   "event_time_tolerance_s": 0.01,
   "tcp_position_tolerance_m": 0.002,
   "force_absolute_tolerance_n": 0.05,
   "force_relative_tolerance": 0.2,
   "impulse_absolute_tolerance_ns": 0.005,
-  "impulse_relative_tolerance": 0.2
+  "impulse_relative_tolerance": 0.2,
+  "seeds": [
+    0,
+    1,
+    2
+  ]
 }

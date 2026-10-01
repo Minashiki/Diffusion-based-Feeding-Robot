@@ -16,7 +16,6 @@ def clip_norm(vector, limit):
 class RobotAdapter:
     def __init__(self, model, data, index, config):
         self.model, self.data, self.index, self.config = model, data, index, config
-        self.reference = mink.Configuration(model)
         self.frame = mink.FrameTask(config["tcp_site"], "site", position_cost=1., orientation_cost=1., lm_damping=1e-4)
         self.frozen_dofs = np.setdiff1d(np.arange(model.nv), index.dofs)
         self.freeze = mink.DofFreezingTask(model, self.frozen_dofs.tolist())
@@ -32,6 +31,10 @@ class RobotAdapter:
         self.reset()
 
     def reset(self):
+        # Scenario reset may change the jaw range. Frozen non-arm DOFs must
+        # use those current bounds, rather than the constructor's cached range.
+        self.limits[0] = mink.ConfigurationLimit(self.model)
+        self.reference = mink.Configuration(self.model)
         self.reference.update(self.data.qpos.copy())
         self.target = mink.SE3.from_rotation_and_translation(
             mink.SO3.from_matrix(self.data.site_xmat[self.index.tcp].reshape(3, 3)),

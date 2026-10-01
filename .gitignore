@@ -5,4 +5,8 @@ __pycache__/
 .pytest_cache/
 outputs/
 datasets/
-extract
+/extract/
+.venv/
+venv/
+/build/
+/dist/

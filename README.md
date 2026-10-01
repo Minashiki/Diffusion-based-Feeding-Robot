@@ -1,6 +1,6 @@
 # FeedingRobot DPRL — M0 / M1 / M3
 
-新勺子和新盘子已接入机械臂，共用完整碰撞模型、TCP/F/T 和执行链；碗保留但不启用。M1 正式验收与新模型证据见 [验收说明](docs/acceptance.md)。M3/M4 框架保留，其正式物理验收和教师放行待后续实施；尚未生成示范集或训练 DP/SAC。
+新勺子和新盘子已接入机械臂，共用完整碰撞模型、TCP/F/T 和执行链；碗保留但不启用。M1 正式验收与新模型证据见 [验收说明](docs/acceptance.md)。M3 双机器人正式物理验收已通过；M4 框架保留，教师放行待后续实施；尚未生成示范集或训练 DP/SAC。
 
 在 `feedingrobot` conda 环境中运行的状态驱动喂餐仿真基础。默认 Panda，支持通过配置切换六轴 UR5e；六维 TCP twist 经 Mink IK 转为 MuJoCo 内置关节位置伺服目标。
 
@@ -8,7 +8,7 @@ M0/M1 提供 P0 接触场景、执行保护、腕部 F/T、环境自检和物理
 
 ## M4 教师与数据管线（未放行）
 
-M4 已加入参数化教师、场景采样、20 Hz 动作／50 Hz 观测／物理子步日志、磁盘分片、恢复标注、独立数据划分与物理命令重放。新模型 M3/M4 均待正式验收，启动示范集未生成；不能据接口或单次 pickup 声称 M4 完成。见 [M4 接口](docs/m4_interfaces.md)，新模型实施顺序与放行要求以 [主方案](SimModelPlann.md) 第 12 节为准。
+M4 已加入参数化教师、场景采样、20 Hz 动作／50 Hz 观测／物理子步日志、磁盘分片、恢复标注、独立数据划分与物理命令重放。新模型 M3 已正式通过，M4 待教师正式验收，启动示范集未生成；不能据接口或单次 pickup 声称 M4 完成。见 [M4 接口](docs/m4_interfaces.md)，新模型实施顺序与放行要求以 [主方案](SimModelPlann.md) 第 12 节为准。
 
 ```bash
 conda run -n feedingrobot python -m feedingrobot.scripts.demo_m4 --robot panda --headless
@@ -23,11 +23,13 @@ conda run -n feedingrobot python -m feedingrobot.scripts.replay outputs/m4/panda
 
 `demo_m4` 默认从盘中食物开始，失败返回非零；去掉 `--headless` 打开只读 viewer。教师放行后，`collect --viewer` 可在采集时显示环境；窗口按墙钟最多 30 FPS 刷新，不固定暂停物理推进，关闭窗口后继续采集。命令会保存独立演示目录。`validate_m4 --trials 3 --cases teacher replay --output outputs/calibration/new_tableware/m4_partial` 只做局部检查，不满足正式放行条件。复用报告或采集目录要求源码／配置／资产哈希一致，版本变化应使用新输出目录；M0 环境记录保留。
 
-快照的任务签名升级至 v2，补齐立即恢复边界的加速度／传感器缓存；旧 v1 任务快照不兼容。
+快照的任务签名升级至 v2，补齐立即恢复边界的加速度／传感器缓存；并记录 event_rules_version=2；旧任务快照和旧事件判据不兼容。
 
 运行仅依赖 `assets/task/tableware/` 中的新勺子和盘子，不读取 `extract/`。保留源 XML/OBJ，装配时移除自由关节、限定默认参数作用域、解析网格路径，并筛选全部 145 个勺子—盘子 pair。工具为 0.035 kg 的刚性子树；传感器补偿完整子树负载，碰撞监控区分勺头与勺柄。所有入口使用同套餐具，旧工具变体接口已移除。来源、坐标与接入方式见 [餐具说明](assets/task/tableware/README.md)。
 
 ## M3 任务环境
+
+新餐具 v2：Panda、UR5e 各 26/26 项通过，各 63 个基准物理运行及 126 组数值对照；M1 各 15/15，全量 pytest 246 项通过。v1 M1 证据保留。取餐采用真实勺头网格与承托载荷、盘坐标最低点及真实接触判据，正常保护不变。
 
 ```bash
 conda run -n feedingrobot python -m feedingrobot.scripts.demo_m3 --robot panda --headless
@@ -78,10 +80,10 @@ conda run -n feedingrobot python -m pip check
 - `configs/scene.json`：公共场景、物理步长、头部驱动与接触保护。
 - `configs/acceptance.json`：正式检查的固定阈值和明确标记的掉落诊断配置。
 - `configs/task.json`：M3 阶段、接触事件及奖励的固定工程阈值。
-- `configs/acceptance_m3.json`：M3 步长对照的事件时间、位置、力及冲量容差。
+- `configs/acceptance_m3.json`：M3 固定 seeds 与步长／求解精度对照的事件时间、位置、力及冲量容差。
 - `outputs/m0/doctor.json`：逐项环境与算法自检。
-- `outputs/new_tableware/v1/m1/<robot>/`：重建后生成的新模型物理报告与轨迹。
-- `outputs/new_tableware/<version>/m3/<robot>/`：重建后生成的事件、快照、收敛和环境验收证据。
+- `outputs/new_tableware/v2/m1/<robot>/`：重建后生成的新模型物理报告与轨迹。
+- `outputs/new_tableware/v2/m3/<robot>/`：重建后生成的事件、快照、收敛和环境验收证据。
 - `outputs/new_tableware/<version>/m4/<robot>/`：重建后生成的教师、重放及放行报告；正式采集显式传入匹配的 `--gate`。
 - `outputs/calibration/new_tableware/`：新模型调试结果，与正式验收分开。
 - `SimModelPlann.md`：从 M1 重建的主方案；`docs/interfaces.md`：执行接口与坐标/时间契约，餐具坐标与完整工具负载已按新模型适配。

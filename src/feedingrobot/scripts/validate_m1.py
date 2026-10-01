@@ -191,7 +191,10 @@ def drop(task, cfg, trace, kind):
         previous_velocity = state["tcp_twist_world"][:3]
         max_speed = max(max_speed, float(np.max(np.abs(state["dq"]))))
         absence = 0 if supported(task) else absence + task.dt
-        if absence >= cfg["support_confirm_s"]:
+        relative = state["tcp_rotation"].T @ (state["food_position"] - state["tcp_position"])
+        outside = (np.any(relative < task.task_config["spoon_support_min_m"])
+                   or np.any(relative > task.task_config["spoon_support_max_m"]))
+        if absence >= cfg["support_confirm_s"] and outside:
             break
     assert absence >= cfg["support_confirm_s"], f"Food did not drop under {kind}"
     final_relative = state["tcp_rotation"].T @ (state["food_position"] - state["tcp_position"])
@@ -364,12 +367,12 @@ def main():
                  acceleration=lambda t, c, tr: drop(t, c, tr, "acceleration"),
                  reachability=reachability, faults=fault_checks, guards=guard_regressions)
     cases["convergence"] = lambda t, c, tr: convergence(args.robot, c, tr)
-    output = ROOT / (args.output or f"outputs/new_tableware/v1/m1/{args.robot}")
+    output = ROOT / (args.output or f"outputs/new_tableware/v2/m1/{args.robot}")
     output.mkdir(parents=True, exist_ok=True)
     inputs = asset_files(args.robot) + list((ROOT / "src/feedingrobot").rglob("*.py"))
     inputs += [ROOT / name for name in ("tests/test_contracts.py", "tests/test_guard_physics.py", "tests/test_tableware.py",
                                        "requirements.lock.txt", "third_party_manifest.json")]
-    report = {"robot_id": args.robot, "model_version": "new_tableware_v1", "acceptance": cfg,
+    report = {"robot_id": args.robot, "model_version": "new_tableware_v2", "acceptance": cfg,
               "input_hashes": {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs},
               "cases": {}}
     for name, check in cases.items():

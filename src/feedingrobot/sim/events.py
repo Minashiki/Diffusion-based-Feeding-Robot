@@ -48,14 +48,24 @@ def evidence(task):
     pairs = {frozenset((r["group1"], r["group2"])) for r in task.contacts
              if r["force_n"] > cfg["contact_min_force_n"]}
     contact = lambda a, b: frozenset((a, b)) in pairs
-    scoop_contact = any(((r["geom1"] in idx.scoop_geoms and r["group2"] == "food")
-                         or (r["geom2"] in idx.scoop_geoms and r["group1"] == "food"))
-                        and r["force_n"] > cfg["contact_min_force_n"] for r in task.contacts
-                        if {r["group1"], r["group2"]} == {"food", "spoon"})
-    supported = (scoop_contact and np.all(rel >= cfg["spoon_support_min_m"])
-                 and np.all(rel <= cfg["spoon_support_max_m"]))
+    scoop = np.concatenate([geom_corners(m, d, g) for g in idx.scoop_geoms])
+    scoop_local = (scoop - tcp) @ tr
+    support_force = sum(float(np.dot(r["force_on_geom2_world"], tr[:, 2]))
+                        * (1 if r["group2"] == "food" else -1)
+                        for r in task.contacts
+                        if ((r["geom1"] in idx.scoop_geoms and r["group2"] == "food")
+                            or (r["geom2"] in idx.scoop_geoms and r["group1"] == "food")))
+    # A loaded side/handle or the empty corners of the rounded mesh AABB are
+    # not a carrying surface. Ray-test the actual 130 convex scoop meshes.
+    over_scoop = (np.all(rel[:2] >= scoop_local[:, :2].min(axis=0))
+                  and np.all(rel[:2] <= scoop_local[:, :2].max(axis=0)))
+    supported = (support_force > cfg["contact_min_force_n"] and over_scoop
+                 and any(mujoco.mj_rayMesh(m, d, g, food, -tr[:, 2]) >= 0
+                         for g in idx.scoop_geoms))
     on_plate = contact("food", "plate")
-    off_plate = (not on_plate and food_corners[:, 2].min() > d.site_xpos[plate, 2] + cfg["plate_clearance_m"])
+    plate_corners = (food_corners - d.site_xpos[plate]) @ d.site_xmat[plate].reshape(3, 3)
+    plate_height = float(plate_corners[:, 2].min())
+    off_plate = not on_plate and plate_height > cfg["plate_clearance_m"]
     tolerance = cfg["receiver_xy_tolerance_m"]
     in_receiver = (np.all(fc[:, :2] >= np.asarray(cfg["receiver_min_xy_m"]) - tolerance)
                    and np.all(fc[:, :2] <= np.asarray(cfg["receiver_max_xy_m"]) + tolerance)
@@ -73,8 +83,7 @@ def evidence(task):
     aperture = float(((upper - d.site_xpos[mouth]) @ mr)[:, 2].min()
                      - ((floor - d.site_xpos[mouth]) @ mr)[:, 2].max())
     width = cfg["receiver_max_xy_m"][1] - cfg["receiver_min_xy_m"][1]
-    carried = np.concatenate([geom_corners(m, d, g) for g in idx.scoop_geoms]
-                             + [food_corners])
+    carried = np.concatenate([scoop, food_corners])
     # Height required by the present spoon/food arrangement, not a future jaw target.
     projected = carried @ mr
     required_height = float(np.ptp(projected[:, 2])) + cfg["clearance_margin_m"]
@@ -83,6 +92,8 @@ def evidence(task):
     aligned = rotation_error(tr, mr) <= cfg["orientation_tolerance_rad"]
     at_wait = np.linalg.norm(tcp - wait) <= cfg["position_tolerance_m"] and aligned
     return dict(supported=bool(supported), off_plate=bool(off_plate), on_plate=on_plate,
+                plate_height_m=plate_height, spoon_support_force_n=support_force,
+                required_height_m=required_height, required_width_m=required_width,
                 mouth_supported=mouth_supported, released=not contact("food", "spoon"),
                 tool_inside=inside, tool_mouth_contact=contact("spoon", "mouth"),
                 at_wait=bool(at_wait), aligned=bool(aligned), aperture_m=aperture,

@@ -133,7 +133,7 @@ class FeedingTask:
         mujoco.mj_saveModel(self.model, None, buffer)
         digest = hashlib.sha256(buffer.tobytes())
         digest.update(json.dumps([self.robot_config, self.scene_config, self.task_config], sort_keys=True).encode())
-        return dict(schema_version=2, robot_id=self.robot_id, task_mode=self.task_mode,
+        return dict(schema_version=2, event_rules_version=2, robot_id=self.robot_id, task_mode=self.task_mode,
                     model_config_hash=digest.hexdigest(), mujoco_version=mujoco.__version__)
 
     def get_state(self):

@@ -29,6 +29,8 @@ class ContactMonitor:
         self.impulse_ns = 0.
         self.over_limit_s = 0.
         self.events = []
+        self.pair_peaks = {}
+        self.pair_impulses = {}
 
     def update(self, contacts, dt, time):
         # Sum contacts per body-group pair; splitting a surface must not hide force.
@@ -37,6 +39,10 @@ class ContactMonitor:
             pair = tuple(sorted([row["group1"], row["group2"]]))
             sums[pair] = sums.get(pair, 0.) + row["force_n"]
         guarded = {p: f for p, f in sums.items() if ("spoon" in p or "arm" in p)}
+        for pair, force in sums.items():
+            key = "|".join(pair)
+            self.pair_peaks[key] = max(self.pair_peaks.get(key, 0.), force)
+            self.pair_impulses[key] = self.pair_impulses.get(key, 0.) + force * dt
         peak = max(guarded.values(), default=0.)
         self.last_peak_n = peak
         self.peak_n = max(self.peak_n, peak)
