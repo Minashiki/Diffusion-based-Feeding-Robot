@@ -53,4 +53,12 @@ mujoco.mj_forward(model, data)
 
 盘子固定在桌面；顶层姿态抵消源内部微小旋转，使底盘支撑面水平。`plate_frame` 位于实际底盘圆柱的顶面，包含内部偏移，桌面顶面为 −0.02 m。食物出生高度由对应碰撞面、食物半尺寸和 0.5 mm 间隙计算，初态不插入表面。承载区域只是几何条件，还必须有真实食物—勺头接触。
 
-上游仓库、资源版本及许可证未随用户资源提供，标为待补充；不沿用机器人的 Menagerie 许可证。基础资源及运行装配配置 SHA256 见根目录来源清单和正式 M1 报告。
+## 来源与许可证
+
+本目录餐具由用户确认来自 [EBiM Benchmark](https://github.com/EBiM-Benchmark/benchmark) 的 `task3_mujoco/`，从 `scene_100.xml` 提取，并核对 `scene_300.xml` 的物体定义。上游 Task 3 源于 Ahmed Shokry 的 `Mujoco_Genisis_Model`；EBiM 的 Task 3 README 与 NOTICE 明确记录，该工作经作者同意以 Apache-2.0 贡献。
+
+随仓库保留上游完整 [LICENSE](../../../docs/licenses/ebim-benchmark/LICENSE)、[NOTICE](../../../docs/licenses/ebim-benchmark/NOTICE) 和 [Task 3 来源说明](../../../docs/licenses/ebim-benchmark/task3_mujoco_README.md)。NOTICE 中其他任务的声明属于上游完整记录，不表示本项目使用了这些任务。
+
+许可文件核查版本为 EBiM commit `161db49e9eafd34be31e5bdada72d8e2f796c16a`；这不是已确认的资产提取版本，实际提取 commit 尚未核实。不能用机器人的 Menagerie 许可证替代餐具许可证。
+
+本项目的修改包括：将物体与接触 pair 提取为独立 MJCF，调整网格相对路径，统一顶层初始位姿；运行装配时移除自由关节、调整安装变换、限定默认参数与材质作用域、添加 site 并筛选有效接触 pair。OBJ 文件保持原始内容。基础资源及运行装配配置 SHA256 见根目录 `third_party_manifest.json` 和正式 M1 报告。

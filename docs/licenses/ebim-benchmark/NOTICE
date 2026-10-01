@@ -1,0 +1,31 @@
+EBiM Benchmark
+Copyright 2026 The EBiM Organizing Committee
+
+This repository includes original work developed by The EBiM Organizing
+Committee (Copyright 2026), released under the Apache License, Version 2.0.
+
+It incorporates and derives from robot_lab
+(https://github.com/fan-ziqi/robot_lab), Copyright 2024-2026 Ziqi Fan,
+used under the Apache License, Version 2.0. The EBiM Benchmark was
+originally scaffolded from robot_lab.
+
+This repository also incorporates portions of Isaac Lab
+(https://github.com/isaac-sim/IsaacLab), Copyright (c) 2022-2026 The
+Isaac Lab Project Developers, used under the BSD-3-Clause license; see
+LICENSES/BSD-3-Clause.txt for the full license text. LICENSES/README.md
+explains why the copyright years in that file and in the two inherited
+Isaac Lab headers differ.
+
+The task1_isaacsim/ directory adapts the franka_isaacSim prototype by
+Marian Körber (Agile Robots). See task1_isaacsim/NOTICE for the full
+attribution and terms; that text is not duplicated here.
+
+The task1_mujoco/ directory vendors the ManipulationNet client
+(https://manipulation-net.org), distributed under the Apache License,
+Version 2.0; see task1_mujoco/mnet_client-ros_2/LICENSE.
+
+The task3_mujoco/ directory is ported from the Mujoco_Genisis_Model
+repository by Ahmed Shokry, contributed to this repository under the
+Apache License, Version 2.0 with the author's agreement. The upstream
+repository carries no LICENSE file of its own, so this paragraph and
+task3_mujoco/README.md record the terms. See CONTRIBUTORS.md.

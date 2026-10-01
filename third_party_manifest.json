@@ -395,11 +395,16 @@
       "modifications": "Extract shared scene/tool, replace arm torque motors by upstream position PD, remove seven-DOF assumptions, extend wrench transforms with rigid-body compensation. No M2 controller copied. Task/tool render groups made visible by default without changing physical contact masks."
     },
     {
-      "repository": null,
+      "repository": "https://github.com/EBiM-Benchmark/benchmark",
       "commit_sha": null,
-      "source_path": "extract",
-      "license": null,
-      "license_status": "Upstream repository/version/license were not supplied; do not assume the Menagerie license.",
+      "source_path": "task3_mujoco",
+      "local_extraction_path": "extract",
+      "license": "Apache-2.0",
+      "license_path": "docs/licenses/ebim-benchmark/LICENSE",
+      "notice_path": "docs/licenses/ebim-benchmark/NOTICE",
+      "license_verification_commit": "161db49e9eafd34be31e5bdada72d8e2f796c16a",
+      "license_status": "Source identified by the user. Task 3 README and NOTICE record contribution by Ahmed Shokry under Apache-2.0 with the author's agreement. Actual asset extraction commit remains unverified; license_verification_commit is only the version of the saved licensing evidence.",
+      "license_files": [{"path": "docs/licenses/ebim-benchmark/LICENSE", "sha256": "ab2cd053f20ef36b0aefbd7af45cd31c96f314d586c717f62791d6f636014026"}, {"path": "docs/licenses/ebim-benchmark/NOTICE", "sha256": "2c08fc3d938d6d623897deaf4fc421791e04a002c5ddbc6ff2574ecfb1a9dcf1"}, {"path": "docs/licenses/ebim-benchmark/task3_mujoco_README.md", "sha256": "62253b733221f2df5c3231bb57b2d219e619ff4a622e3c18db016c55a446e88c"}],
       "runtime_root": "assets/task/tableware",
       "active_assets": [
         "spoon",
