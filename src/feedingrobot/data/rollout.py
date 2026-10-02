@@ -10,20 +10,25 @@ import numpy as np
 from feedingrobot.data.episodes import EpisodeWriter, annotate, input_hashes
 from feedingrobot.envs import FeedingGymEnv
 from feedingrobot.experts import Teacher
+from feedingrobot.experts.geometry import teacher_geometry
 from feedingrobot.sim.events import PHASES, evidence
 
 
 def run_episode(robot, seed, config, directory, *, scenario=None, teacher_parameters=None,
-                timestep=.001, iterations=None, viewer=False, split="calibration", group_id=None,
+                timestep=.001, iterations=None, solver_tolerance=None, viewer=False, split="calibration", group_id=None,
                 max_episode_s=None):
     scenario = dict(config["scene"], **(scenario or {}))
     env = FeedingGymEnv(robot, timestep=timestep, max_episode_s=max_episode_s)
     task = env.task
     if iterations is not None:
         task.model.opt.iterations = iterations
+    if solver_tolerance is not None:
+        task.model.opt.tolerance = solver_tolerance
     env.reset(seed=seed, options={"scenario": scenario or {}})
     teacher = Teacher(task.robot_config, config)
-    teacher.reset(teacher_parameters or {})
+    geometry = teacher_geometry(task)
+    teacher.reset(teacher_parameters or {}, geometry=geometry)
+    frozen_hashes = input_hashes()
     action_ticks, obs_ticks = round(.05 / task.dt), round(.02 / task.dt)
     if not np.isclose(action_ticks * task.dt, .05) or not np.isclose(obs_ticks * task.dt, .02):
         env.close()
@@ -64,7 +69,7 @@ def run_episode(robot, seed, config, directory, *, scenario=None, teacher_parame
                 writer.record_observation(task.tick, PHASES.index(task.logic.phase), last_observation, valid=valid)
                 if display is not None:
                     previous = display.report.copy()
-                    display.update()
+                    display.update(phase=task.logic.phase, result=task.failure_reason or ("success" if task.logic.success else "running"))
                     if display.report != previous and display.report["status"] in ("closed", "unavailable"):
                         print(f"Viewer disabled; continuing headless: {display.report.get('reason')}", flush=True)
             for event in task.logic.events[event_start:]:
@@ -82,9 +87,12 @@ def run_episode(robot, seed, config, directory, *, scenario=None, teacher_parame
         events = copy.deepcopy(task.logic.events)
         visualization = (dict(requested=True, **display.close()) if display is not None
                          else dict(requested=False, status="disabled"))
+        if input_hashes() != frozen_hashes:
+            raise ValueError("Runtime inputs changed during the episode; recording cannot be accepted")
         result = dict(robot_id=robot, seed=seed, split=split, group_id=group_id or f"{robot}:{split}:{seed}",
                       scenario=scenario or {}, teacher_parameters=teacher_parameters or {}, teacher_config=config,
-                      signature=task.state_signature(), input_hashes=input_hashes(), time_s=float(task.data.time),
+                      teacher_geometry_sha256=geometry["sha256"],
+                      signature=task.state_signature(), input_hashes=frozen_hashes, time_s=float(task.data.time),
                       max_episode_s=env.max_episode_s,
                       wall_s=time.monotonic() - start, success=task.logic.success, truncated=truncated,
                       visualization=visualization,
@@ -92,9 +100,12 @@ def run_episode(robot, seed, config, directory, *, scenario=None, teacher_parame
                       failure_reason=task.failure_reason, phase=task.logic.phase, events=events,
                       evidence=evidence_events, segments=annotate(events),
                       contact_peak_n=task.monitor.peak_n, contact_impulse_ns=task.monitor.impulse_ns,
+                      contact_group_peaks_n=copy.deepcopy(task.monitor.pair_peaks),
+                      contact_group_impulses_ns=copy.deepcopy(task.monitor.pair_impulses),
                       contact_over_limit_s=task.monitor.over_limit_s,
                       wrist_peak_n=float(np.max(writer.physics[:writer.physics_rows, -3])) if writer.physics_rows else 0.,
                       solver_iterations=int(task.model.opt.iterations),
+                      solver_tolerance=float(task.model.opt.tolerance),
                       accepted_normal=bool(task.logic.success),
                       accepted_recovery=any(s["recovery_valid"] for s in annotate(events)),
                       rejection_reason=None if task.logic.success else task.failure_reason or "time_limit")

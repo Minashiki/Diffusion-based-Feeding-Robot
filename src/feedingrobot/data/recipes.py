@@ -7,6 +7,7 @@ import numpy as np
 
 
 FOLDS = {"train": set(range(1, 16)), "validation": {16, 17}, "test": {18, 19}, "acceptance": {0}}
+FOLDS["calibration"] = FOLDS["train"]
 
 
 def recipe(config, split, index, *, recover=False):

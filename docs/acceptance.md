@@ -59,3 +59,5 @@ conda run -n feedingrobot python -m feedingrobot.scripts.validate_m3 --robot ur5
 默认输出为 `outputs/new_tableware/v2/m1/<robot>/` 与 `v2/m3/<robot>/`。局部调试显式使用 `--output outputs/calibration/new_tableware/<name>`。所有必需项目通过才为 passed；局部运行、未选择项目或 viewer 不可用保持 incomplete，返回非零。
 
 下一阶段按 [主方案](../SimModelPlann.md) 第 12 节重建 M4，先验证真实取餐，再验证承载运输、入口交付与撤离，冻结后执行独立教师门槛。本轮未生成正式示范集或训练策略。
+
+M4 当前重建进展及取餐停步证据见 [M4 重建状态](m4_rebuild_status.md)。M1/M3 v2 放行结论保持；该记录不构成 M4 放行。

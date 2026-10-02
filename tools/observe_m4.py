@@ -9,7 +9,7 @@ import math
 import pickle
 import sys
 import time
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -17,6 +17,32 @@ from unittest.mock import patch
 
 TASK_FAILURES = {"food_dropped", "food_lost_after_delivery",
                  "withdrawal_before_release", "food_missing"}
+
+
+@contextmanager
+def recorded_asset_paths(source_root, workspace, manifest):
+    """Keep recorded mesh paths in MJB signatures when using archived code."""
+    if source_root == workspace or manifest is None:
+        yield
+        return
+    from feedingrobot.sim import model
+    original = model._merge_asset
+
+    def merge(root, path, *args):
+        world = original(root, path, *args)
+        for mesh in root.findall("asset/mesh"):
+            archived = Path(mesh.get("file"))
+            if archived.is_relative_to(source_root):
+                relative = archived.relative_to(source_root)
+                recorded = workspace / relative
+                expected = manifest["input_hashes"].get(str(relative))
+                if not recorded.is_file() or hashlib.sha256(recorded.read_bytes()).hexdigest() != expected:
+                    raise ValueError(f"Recorded mesh is missing or changed: {relative}")
+                mesh.set("file", str(recorded))
+        return world
+
+    with patch.object(model, "_merge_asset", merge):
+        yield
 
 
 def seconds(value):
@@ -169,7 +195,8 @@ class Observation:
             self.task = task
             if self.manifest is not None:
                 self.teacher = Teacher(task.robot_config, self.manifest["teacher_config"])
-                self.teacher.reset(self.manifest["teacher_parameters"])
+                from feedingrobot.experts.geometry import teacher_geometry
+                self.teacher.reset(self.manifest["teacher_parameters"], geometry=teacher_geometry(task))
 
         def act(teacher, observation):
             self.teacher = teacher
@@ -212,7 +239,8 @@ class Observation:
             if before is not None:
                 self.diagnostics.boundary(task, self.teacher, before)
             if active and self.display is not None and (task.tick % round(.02 / task.dt) == 0 or task.terminated):
-                self.display.update()
+                self.display.update(phase=task.logic.phase,
+                                    result=task.failure_reason or ("success" if task.logic.success else "running"))
                 if self.display.report["status"] in ("closed", "unavailable") and self.disabled_reason is None:
                     self.disabled_reason = self.display.report.get("reason", self.display.report["status"])
                     print(f"Viewer disabled; original episode continues headless: {self.disabled_reason}", flush=True)
@@ -261,6 +289,7 @@ class Observation:
         try:
             task = env.task
             task.model.opt.iterations = original["solver_iterations"]
+            task.model.opt.tolerance = original["solver_tolerance"]
             env.reset(seed=original["seed"], options={"scenario": original["scenario"]})
             state = copy.deepcopy(self.capture["state"])
             state["logic"]["failure_reason"] = None
@@ -339,7 +368,7 @@ class Observation:
                                                 observation=env.observe_policy() if valid else None))
                         elapsed = (task.tick - start_tick) * task.dt
                         time.sleep(max(0., start_wall + elapsed - time.monotonic()))
-                        self.display.update()
+                        self.display.update(phase=task.logic.phase, result=task.failure_reason or "observation branch")
                         if self.display.report["status"] != "running":
                             reason = self.display.report.get("reason", "viewer_unavailable")
                             break
@@ -375,34 +404,35 @@ def main(argv=None):
     manifest = load_episode(args.episode)[0] if args.episode else None
     observer = Observation(args.viewer, args.post_failure_seconds, manifest,
                            directory if args.diagnostics else None)
-    try:
-        with observer:
-            if args.episode:
-                replay = replay_episode(args.episode)
-                original = manifest
-            else:
-                case = json.loads(args.cases_file.read_text())[args.case]
-                original = run_episode("panda", case["seed"], load_json("configs/collect.json"),
-                                       directory / "episode", scenario=case["scenario"],
-                                       teacher_parameters=case["teacher_parameters"], max_episode_s=60.,
-                                       split="inspection", group_id=f"inspection:{args.case}")
-                replay = None
-        branch = observer.continue_failure(original, directory / "branch")
-        visualization = (observer.display.close() if observer.display else dict(status="disabled"))
-        summary = dict(original=dict(time_s=original["time_s"], failure_reason=original["failure_reason"],
-                                     success=original["success"], truncated=original["truncated"],
-                                     events=original["events"]), branch=branch, visualization=visualization,
-                       replay=replay, replay_teacher_max_error=observer.teacher_error,
-                       source_root=str(source_root), input_hashes=original["input_hashes"],
-                       observer_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
-                       diagnostics_requested=args.diagnostics,
-                       source_episode=str(args.episode.resolve()) if args.episode else str(directory / "episode"))
-        write_json(directory / "summary.json", summary)
-        print(f"Inspection evidence: {directory}", flush=True)
-        print(json.dumps({k: v for k, v in branch.items() if k != "events"}, ensure_ascii=False), flush=True)
-    finally:
-        if observer.display:
-            observer.display.close()
+    with recorded_asset_paths(source_root, Path(__file__).resolve().parents[1], manifest):
+        try:
+            with observer:
+                if args.episode:
+                    replay = replay_episode(args.episode)
+                    original = manifest
+                else:
+                    case = json.loads(args.cases_file.read_text())[args.case]
+                    original = run_episode("panda", case["seed"], load_json("configs/collect.json"),
+                                           directory / "episode", scenario=case["scenario"],
+                                           teacher_parameters=case["teacher_parameters"], max_episode_s=60.,
+                                           split="inspection", group_id=f"inspection:{args.case}")
+                    replay = None
+            branch = observer.continue_failure(original, directory / "branch")
+            visualization = (observer.display.close() if observer.display else dict(status="disabled"))
+            summary = dict(original=dict(time_s=original["time_s"], failure_reason=original["failure_reason"],
+                                         success=original["success"], truncated=original["truncated"],
+                                         events=original["events"]), branch=branch, visualization=visualization,
+                           replay=replay, replay_teacher_max_error=observer.teacher_error,
+                           source_root=str(source_root), input_hashes=original["input_hashes"],
+                           observer_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                           diagnostics_requested=args.diagnostics,
+                           source_episode=str(args.episode.resolve()) if args.episode else str(directory / "episode"))
+            write_json(directory / "summary.json", summary)
+            print(f"Inspection evidence: {directory}", flush=True)
+            print(json.dumps({k: v for k, v in branch.items() if k != "events"}, ensure_ascii=False), flush=True)
+        finally:
+            if observer.display:
+                observer.display.close()
 
 
 if __name__ == "__main__":

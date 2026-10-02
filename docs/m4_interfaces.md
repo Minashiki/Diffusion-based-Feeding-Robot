@@ -1,39 +1,42 @@
 # M4 教师、采集与物理重放接口
 
-当前实现需按 [SimModelPlann.md](../SimModelPlann.md) 从 M1 适配新勺子和新盘子，碗暂不接入。旧餐具验收报告与成绩摘要已删除，新模型尚未物理放行；共用餐具路径与几何接口已适配，教师参数待后续物理标定。没有 DP/SAC 训练。正式采集必须先通过冻结教师的 Panda 100 种子门槛；代码、测试或取餐事件通过均不能替代完整喂餐验收。
+新餐具 M1/M3 v2 已正式放行，证据保留在 [验收报告](acceptance.md)。M4 正在重建：几何教师、验收门禁和显示接口已实现，候选参数仍在物理标定，尚未取得稳定真实取餐、完整教师放行或正式数据。没有 DP/SAC 训练。旧教师参数与成功证据不能用于新餐具采集。
 
 ## 教师与执行
 
-`Teacher(robot_config, config)`、`Teacher.reset(parameters)`、`Teacher.act(policy_obs)`：输入为 `StateProvider.observe()["policy_obs"]` 字典；输出六维基座系 TCP twist，单位 m/s、rad/s。教师维护阶段内路径进度和从当前／过去嘴部位置估计的速度，仅使用当前位姿、交互标记和补偿 F/T。它不接收 oracle、未来驱动计划或随机种子，不修改 MuJoCo 物理状态、任务阶段或结果标记。
+`Teacher(robot_config, config)`、`Teacher.reset(parameters, *, geometry=...)`、`Teacher.act(policy_obs)`：输入为 `StateProvider.observe()["policy_obs"]` 字典；输出六维基座系 TCP twist，单位 m/s、rad/s。教师维护阶段内路径进度和从当前／过去嘴部位置估计的速度，仅使用当前位姿、交互标记和补偿 F/T。它不接收 oracle、未来驱动计划或随机种子，不修改 MuJoCo 物理状态、任务阶段或结果标记。
 
 原始教师提议和下发命令分开；命令先受教师速度约束，再进入现有 RobotAdapter 的范数限速、变化率限制、目标积分、Mink IK 与 MuJoCo 位置伺服。`check_waypoints(task, waypoints)` 使用独立 Mink Configuration，不写回模拟器。离线可达不证明接触任务成功。
 
-取餐教师依次执行原位转勺、原位下降到接近高度、平移接近、调整舀取姿态、下降、有限舀取及抬升。舀取终点由初始食物位置计算并限制世界系 x 上界，不随被推动的食物前移。`pickup` 导致阶段进入 `TRANSPORT` 时仍保留取餐子段；真实取餐后抬升超过 `tilt_start_height_m` 才形成 `early_carry_pitch_rad` 承载姿态，且不因高度短暂回落而反转。完成 `lift_height_m` 处连续承载等待后，以固定横向目标和 `transport_pitch_rad` 姿态升至运输高度；位置、姿态和勺内食物位置满足教师条件后，平移至嘴前等待位并同时对齐嘴部姿态。运输子段只向前推进，避免原位对齐触及关节限制。取餐捕获阈值 `scoop_capture_m` 与运输居中阈值 `capture_center_m` 分开。
+环境 reset 后通过 `teacher_geometry(task)` 提取盘面坐标、盘沿、真实勺唇、承载网格、全餐具包络、食物尺寸及关节范围的只读副本。教师持有该副本，不持有模拟器引用；动态信息仅来自当前／过去的 `policy_obs`。Gym 观测维度不变。
+
+真实勺头为下凹曲面，不能沿用平铲的水平扫取。取餐路径在盘面坐标系按真实网格计算最低点与 TCP 高度，依次转勺、接近、下降、有限弧形舀取、转勺承托和抬升；行程锚定初始食物位置。承托反馈只控制路径推进，真实 `pickup` 仍由 M3 判定。转勺、运输、释放和恢复的参数尚未物理冻结，不把短暂接触视为取餐通过。
 
 M4 的非故障阶段取消使用 `RobotAdapter.stop(hold_reference=True)`：清除旧命令，保留负载下的伺服参考，并按既有加速度限制将参考速度降到零。减速继续经过原有限速、参考偏差、IK、碰撞及物理保护。默认 `stop()` 和故障停止仍清零参考速度并在实际关节位置重新锁定目标；不改变保护阈值或伺服增益。
 
 `FeedingGymEnv.observe_policy()` 返回与原 Gym 一致的观测向量副本。Gym `step()` 的 20 ms 步长、归一化动作、Panda 96／UR5e 94 维 schema 保持兼容。采集器直接复用唯一物理入口 `FeedingTask.step_physics()`，不以交替 2／3 个 Gym 步近似 50 ms 动作周期。
 
-`run_episode(..., viewer=True)` 和 `collect --viewer` 使用独立进程中的被动 MuJoCo viewer，显示模型与积分状态的副本。刷新按墙钟最多 30 FPS，单帧队列满时丢弃显示帧，不暂停或丢弃物理子步、动作或观测。窗口关闭或启动失败只关闭显示，回合继续运行；manifest 的可选 `visualization` 元数据记录请求、状态、原因及帧数。原回合数组、命令、快照与 schema 不变。无 `--viewer` 的正式采集仍使用无界面方式；显示不绕过教师放行检查。后续训练接入显示时沿用额外耗时超过 50% 则关闭实时显示的约定，本阶段未实现训练入口。
+`run_episode(..., viewer=True)` 和 `collect --viewer` 使用独立进程中的被动 MuJoCo viewer，显示模型与积分状态的副本。刷新按墙钟最多 30 FPS，单帧队列满时丢弃显示帧，不暂停或丢弃物理子步、动作或观测。窗口关闭或启动失败只关闭显示，回合继续运行；manifest 的可选 `visualization` 元数据记录请求、状态、原因及帧数。原回合数组、命令、快照与 schema 不变。教师验收和正式采集默认显示，`--headless` 显式关闭；并行验收只显示一个执行环境。显示标注阶段与结果。`benchmark_visualization` 在预热后执行三组等工作量对照，以中位耗时之比判定；超过 1.5 倍时 `apply_training_budget` 关闭显示并保存测量。等工作量和恢复初态由训练入口保证；M5 的当前模型闭环评估及 M6 的单个实际采样环境接入尚未实施。
 
 ## 失败后继续仿真的观察入口
 
-在仓库根目录、`feedingrobot` conda 环境中运行：
+在桌面终端进入仓库，使用已保存的固定场景回合及匹配的冻结版本：
 
 ```bash
-python tools/observe_m4.py \
-  --cases-file outputs/calibration/m4/step2_v3/cases.json \
-  --case 1 --viewer --post-failure-seconds 5
+cd /home/minashiki/FeedingRobot_DPRL
+/home/minashiki/anaconda3/envs/feedingrobot/bin/python tools/observe_m4.py \
+  --episode outputs/calibration/new_tableware/m4/rebuild_check_01/calibration/fixed_0 \
+  --source-root outputs/calibration/new_tableware/m4/rebuild_check_01/frozen_inputs \
+  --viewer --diagnostics
 ```
 
-`--post-failure-seconds` 默认 `0`，接受任意有限非负秒数，包括 `2`、`5`、`2.5`。正值须同时指定 `--viewer`。`--case` 必须与 `--cases-file` 一起使用，按该文件的场景及教师参数重新运行当前 Panda 候选；它与保存回合重放模式互斥。`--source-root` 默认当前仓库，也可指定对应冻结源码及配置目录：
+这是原命令的真实物理重放，同时核对教师历史、事件与结局。工具使用冻结源码和配置；归档网格路径映射到经 SHA256 验证的原资产路径，保持原模型签名检查。原资产缺失或变化会拒绝重放。每次复盘产生独立的 `outputs/inspection/m4/<时间戳>/` 目录。
 
-```bash
-python tools/observe_m4.py \
-  --episode outputs/calibration/m4/step2_v3/final_regression/1/episode \
-  --source-root outputs/calibration/m4/step2_v3/frozen_inputs \
-  --viewer --post-failure-seconds 2
-```
+已验证的复盘摘要位于 `outputs/inspection/m4/20261002T074914_931714Z/summary.json`，教师命令、观测及物理参考误差均为 0；同目录 `diagnostics.jsonl.gz` 保存逐物理步诊断，`diagnostic_commands.jsonl` 保存命令与执行器切换。
+
+此回合仿真 60 秒，在 ACQUIRE 时间截断，无 pickup。墙钟播放可能更久；当前入口没有暂停、逐帧或时间滑块，关闭 viewer 后原命令重放继续。已有诊断试验的 `trace.jsonl` 可逐时刻查看，但这些 trace 不具备完整快照及命令记录，不能作为严格重放入口。
+
+`--post-failure-seconds` 默认 `0`，接受任意有限非负秒数，包括 `2`、`5`、`2.5`。正值须同时指定 `--viewer`。`--case` 必须与 `--cases-file` 一起使用，按该文件的场景及教师参数重新运行当前 Panda 候选；它与保存回合重放模式互斥。`--source-root` 默认当前仓库；复盘此历史回合须显式使用上述冻结目录。
 
 保存回合仍通过原重放器严格核对输入哈希、命令、观测、物理日志、事件和结局。观察入口在每个原命令边界用实时观测重建教师历史，并核对教师命令，重放物理仍执行保存的原命令。新工具位于原输入哈希集合之外，不修改冻结源码、教师、配置或事件判据。
 
@@ -47,7 +50,7 @@ python tools/observe_m4.py \
 
 ## 场景与模型版本
 
-当前实现的共享承接判定 `receiver_xy_tolerance_m` 为 0.0005 m：食物全部角点须处于扩展后的水平承接边界内，并具有真实食物—嘴部接触。容差不扩展嘴部净空宽度，也不放宽高度、底面、释放、持续承接或退出条件。新模型重建时按主方案重新验证该几何判据，不能沿用已删除的旧验收成绩。
+当前实现的共享承接判定 `receiver_xy_tolerance_m` 为 0.0005 m：食物全部角点须处于扩展后的水平承接边界内，并具有真实食物—嘴部接触。容差不扩展嘴部净空宽度，也不放宽高度、底面、释放、持续承接或退出条件。该几何判据已随新模型 M3 v2 放行，M4 保持原值。
 
 `env.reset(seed=..., options={"scenario": parameters})` 新增可选场景参数：食物质量、滑动摩擦、盘内偏移；头部原点、有限行程内偏移、幅度、频率、初相位；`recover`。数值范围在 `sim/scenarios.py` 校验，默认 reset 仍使用原 M3 场景。模型质量、惯量、摩擦和头部原点仅在 reset 更改；随后由原有限力驱动推进。
 
@@ -55,7 +58,7 @@ python tools/observe_m4.py \
 
 所有入口现统一使用新勺子与新盘子，工具选择参数及旧变体已移除。工具质量为 0.035 kg；TCP、负载补偿和承载区域已按新模型适配。教师参数尚待 M4 物理标定，不把接口回归通过视为完整教师放行。
 
-M4 配置使用头部原点 `[0.67, 0.12, 0.35]`，独立于默认 M3 `[0.55, 0.12, 0.35]`。两个布局使用同套餐具，场景模型签名不同，数据与快照不可混用。资产、模型、配置及源码哈希保存在每个 episode。
+M4 配置使用已放行的 M3 默认头部原点 `[0.55, 0.12, 0.35]`。旧 M4 的远端布局不再用于本次教师放行。不同场景模型签名的数据与快照不可混用。资产、模型、配置及源码哈希保存在每个 episode。
 
 任务快照签名升级至 **v2**：在积分状态之外保存边界 `qacc` 和 `sensordata`，使恢复后立即读取的 F/T 与原始边界一致。外层 Gym 快照和观测 schema 仍为 v1。旧任务 v1 快照被拒绝，不把重新计算过的边界传感器冒充原缓存。
 
@@ -81,4 +84,4 @@ M4 配置使用头部原点 `[0.67, 0.12, 0.35]`，独立于默认 M3 `[0.55, 0.
 
 常规与恢复分别按 train/validation/test 的 100/15/15 配额采集。每类每 split 最多尝试配额的三倍；不足则保存统计并非零退出。恢复计数是已标注完成片段的回合数，不是截取任意动作的数量。`normalization.json` 只统计 train 的合法动作观测；常量字段使用尺度 1，并保留原始 std。
 
-`collect` 核对 Panda 100 次独立试验、至少 95 次完整成功、教师配置及全部输入哈希。放行状态与整体 M4 验收状态分开，避免要求先有数据才能生成数据。当前教师若未通过门槛，采集命令会拒绝创建正式数据集。
+`collect` 核对 Panda 正常至少 95/100、恢复 10/10，UR5e 正常和恢复各 5/5，双机器人全部物理检查、教师配置及完整输入哈希。每机器人收敛预先固定正常／恢复各 5 个，不得替换失败用例；比较 1 ms／100 次迭代、0.5 ms／100 次迭代、1 ms／200 次迭代且求解容差缩小十倍，保持 M3 的事件、TCP、力和冲量容差。放行状态与整体 M4 验收状态分开，避免要求先有数据才能生成数据。当前教师若未通过门槛，采集命令会拒绝创建正式数据集。

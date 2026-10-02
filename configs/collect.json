@@ -1,31 +1,33 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "teacher": {
     "scoop_yaw_rad": 0.0,
-    "scoop_pitch_rad": 0.02,
-    "scoop_start_offset_m": 0.045,
-    "scoop_height_m": 0.0138,
-    "scoop_travel_m": 0.08,
-    "lift_height_m": 0.12,
+    "scoop_pitch_rad": 1.1,
+    "scoop_start_offset_m": 0.035,
+    "scoop_travel_m": 0.02,
+    "plate_gap_m": 0.0005,
+    "approach_clearance_m": 0.06,
+    "lift_clearance_m": 0.12,
+    "tilt_clearance_m": 0.04,
+    "capture_margin_m": 0.0001,
+    "carry_pitch_rad": 0.0,
     "linear_speed_m_s": 0.025,
-    "angular_speed_rad_s": 0.3,
+    "angular_speed_rad_s": 0.5,
+    "transport_speed_m_s": 0.05,
     "position_gain": 3.0,
     "orientation_gain": 3.0,
     "waypoint_tolerance_m": 0.001,
-    "wait_offset_m": 0.06,
-    "insert_depth_m": 0.008,
-    "insert_height_m": -0.006,
-    "release_pitch_rad": 0.2,
-    "release_retreat_m": -0.015,
-    "transport_height_m": 0.35,
-    "capture_center_m": 0.01,
-    "transport_pitch_rad": -0.2,
-    "tilt_start_height_m": 0.045,
-    "transport_speed_m_s": 0.05,
-    "early_carry_pitch_rad": -0.08,
+    "orientation_tolerance_rad": 0.03,
     "pickup_hold_s": 0.2,
-    "approach_height_m": 0.06,
-    "scoop_capture_m": 0.0225
+    "insert_depth_m": 0.004,
+    "insert_height_m": -0.006,
+    "release_pitch_rad": 0.35,
+    "scoop_exit_pitch_rad": 0.0,
+    "arc_start_offset_m": 0.015,
+    "arc_length_m": 0.03,
+    "max_slide_speed_m_s": 0.01,
+    "carry_margin_m": 0.006,
+    "roll_speed_m_s": 0.025
   },
   "quotas": {
     "train": 100,
@@ -58,25 +60,13 @@
       0.2
     ]
   },
-  "teacher_ranges": {
-    "scoop_pitch_rad": [
-      0.015,
-      0.025
-    ],
-    "scoop_yaw_rad": [
-      -0.01,
-      0.01
-    ],
-    "lift_height_m": [
-      0.115,
-      0.125
-    ]
-  },
+  "teacher_ranges": {},
   "scene": {
     "head_origin_m": [
-      0.67,
+      0.55,
       0.12,
       0.35
     ]
-  }
+  },
+  "teacher_status": "calibrating"
 }

@@ -11,6 +11,7 @@ from feedingrobot.data.rollout import run_episode
 from feedingrobot.control.adapter import RobotAdapter
 from feedingrobot.envs import FeedingGymEnv
 from feedingrobot.experts import Teacher
+from feedingrobot.experts.geometry import teacher_geometry
 from feedingrobot.experts.feasibility import check_waypoints
 from feedingrobot.scripts.collect import check_gate, dataset_statistics
 from feedingrobot.sim.model import load_json
@@ -23,6 +24,7 @@ def test_teacher_units_bounds_and_no_physics_writes(robot):
     env = FeedingGymEnv(robot)
     env.reset(seed=0)
     teacher = Teacher(env.task.robot_config, load_json("configs/collect.json"))
+    teacher.reset({}, geometry=teacher_geometry(env.task))
     before = env.task.get_state()
     obs = env.task.provider.observe()["policy_obs"]
     action = teacher.act(obs)
@@ -30,31 +32,29 @@ def test_teacher_units_bounds_and_no_physics_writes(robot):
     assert np.linalg.norm(action[:3]) <= env.task.robot_config["linear_speed_limit"]
     assert np.linalg.norm(action[3:]) <= env.task.robot_config["angular_speed_limit"]
     np.testing.assert_array_equal(before["physics"], env.task.get_state()["physics"])
-    teacher.reset({})
+    teacher.reset({}, geometry=teacher_geometry(env.task))
     obs["future_events"] = [{"time": 0., "jaw": "close"}]
     obs["scenario_state"] = {"seed": -1}
     np.testing.assert_array_equal(action, teacher.act(obs))
     env.close()
 
 
-def test_acquisition_rotates_then_lowers_before_lateral_approach():
+def test_acquisition_rotates_then_approaches_plate_frame():
     env = FeedingGymEnv()
     env.reset(seed=0)
     teacher = Teacher(env.task.robot_config, load_json("configs/collect.json"))
+    teacher.reset({}, geometry=teacher_geometry(env.task))
     obs = env.task.provider.observe()["policy_obs"]
-    obs["tcp_rotation"] = mink.SO3.exp(np.array([0., 0., .4])).as_matrix() @ obs["tcp_rotation"]
     position = obs["tcp_position"].copy()
     command = teacher.act(obs)
     np.testing.assert_array_equal(teacher.target_position, position)
     np.testing.assert_array_equal(command[:3], np.zeros(3))
     obs["stage"] = "ACQUIRE"
-    teacher.act(obs)
-    np.testing.assert_array_equal(teacher.target_position, position)
     obs["tcp_rotation"] = teacher.target_rotation.copy()
     teacher.act(obs)
     teacher.act(obs)
-    np.testing.assert_array_equal(teacher.target_position[:2], position[:2])
-    assert teacher.target_position[2] == teacher.parameters["approach_height_m"]
+    np.testing.assert_allclose(teacher.target_position[2], teacher.geometry["plate_position"][2]
+                               + teacher.parameters["approach_clearance_m"])
     env.close()
 
 
@@ -62,9 +62,10 @@ def test_scoop_endpoint_is_bounded_when_food_is_pushed_forward():
     env = FeedingGymEnv()
     env.reset(seed=0)
     teacher = Teacher(env.task.robot_config, load_json("configs/collect.json"))
+    teacher.reset({}, geometry=teacher_geometry(env.task))
     obs = env.task.provider.observe()["policy_obs"]
     teacher.act(obs)
-    teacher.part = 5  # Isolate a teacher subsegment, not a physical pickup claim.
+    teacher.part = 3  # Isolate a teacher subsegment, not a physical pickup claim.
     obs["stage"] = "ACQUIRE"
     teacher.act(obs)
     target = teacher.target_position.copy()
@@ -75,7 +76,7 @@ def test_scoop_endpoint_is_bounded_when_food_is_pushed_forward():
     obs["stage"] = "TRANSPORT"
     command = teacher.act(obs)
     np.testing.assert_array_equal(teacher.target_position, target)
-    assert teacher.capture_position is None and teacher.part == 5
+    assert teacher.capture_position is None and teacher.part == 3
     assert np.linalg.norm(command[:3]) <= teacher.parameters["linear_speed_m_s"]
     env.close()
 
@@ -84,9 +85,11 @@ def test_pickup_phase_continues_lift_and_requires_uninterrupted_hold():
     env = FeedingGymEnv()
     env.reset(seed=0)
     teacher = Teacher(env.task.robot_config, load_json("configs/collect.json"))
+    teacher.reset({}, geometry=teacher_geometry(env.task))
     obs = env.task.provider.observe()["policy_obs"]
     teacher.act(obs)
-    teacher.part = 6
+    teacher.capture_roll_complete = True
+    teacher.part = 4
     teacher.capture_position = obs["tcp_position"].copy()
     obs["tcp_position"] = obs["tcp_position"].copy()
     obs["tcp_position"][2] = .03
@@ -95,7 +98,7 @@ def test_pickup_phase_continues_lift_and_requires_uninterrupted_hold():
     teacher.act(obs)
     obs["stage"] = "TRANSPORT"
     command = teacher.act(obs)
-    assert teacher.target_position[2] == teacher.parameters["lift_height_m"]
+    np.testing.assert_allclose(teacher.target_position[2], teacher.geometry["plate_position"][2] + teacher.parameters["lift_clearance_m"], atol=1e-12)
     assert np.linalg.norm(command[:3]) <= teacher.parameters["linear_speed_m_s"]
     obs["tcp_position"] = teacher.target_position.copy()
     obs["tcp_rotation"] = teacher.target_rotation.copy()

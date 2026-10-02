@@ -1,6 +1,8 @@
 import importlib.util
+import hashlib
 import json
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 import numpy as np
 import pytest
@@ -18,6 +20,28 @@ observe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(observe)
 
 
+def test_archived_mesh_paths_require_recorded_bytes(tmp_path, monkeypatch):
+    from feedingrobot.sim import model
+    archive, workspace = tmp_path/"archive", tmp_path/"workspace"
+    relative = Path("assets/mesh.obj")
+    recorded = workspace/relative
+    recorded.parent.mkdir(parents=True)
+    recorded.write_bytes(b"recorded mesh")
+    manifest = dict(input_hashes={str(relative): hashlib.sha256(recorded.read_bytes()).hexdigest()})
+    def merge(root, path):
+        ET.SubElement(root.find("asset"), "mesh", file=str(archive/relative))
+        return "world"
+    monkeypatch.setattr(model,"_merge_asset",merge)
+    with observe.recorded_asset_paths(archive,workspace,manifest):
+        root = ET.fromstring("<mujoco><asset/></mujoco>")
+        assert model._merge_asset(root,None)=="world"
+        assert root.find("asset/mesh").get("file")==str(recorded)
+        recorded.write_bytes(b"changed mesh")
+        with pytest.raises(ValueError,match="missing or changed"):
+            model._merge_asset(ET.fromstring("<mujoco><asset/></mujoco>"),None)
+    assert model._merge_asset is merge
+
+
 class Display:
     status, reason = "running", None
 
@@ -28,7 +52,7 @@ class Display:
     def start(self):
         return self.report.copy()
 
-    def update(self):
+    def update(self, **kwargs):
         pass
 
     def close(self):
@@ -183,7 +207,7 @@ def test_phase_cancellation_preserves_reference_in_branch(tmp_path, monkeypatch,
 def test_window_closed_during_tail_ends_observation(tmp_path, monkeypatch, display):
     fail_at_tick(monkeypatch)
 
-    def update(viewer):
+    def update(viewer, **kwargs):
         if viewer.data.time > .054:
             viewer.report.update(status="closed", reason="window_closed")
 

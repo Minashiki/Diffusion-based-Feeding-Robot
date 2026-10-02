@@ -9,32 +9,47 @@ import numpy as np
 from feedingrobot.data.episodes import annotate, input_hashes, load_episode, write_json
 from feedingrobot.data.recipes import recipe
 from feedingrobot.data.rollout import run_episode
+from feedingrobot.data.replay import replay_episode
+from feedingrobot.experts.gate import matching_teachers_passed
 from feedingrobot.sim.model import ROOT
 
 
 def check_gate(report, config, robot):
-    if (report.get("teacher_gate") != "passed" or report.get("robot_id") != robot
+    if (robot != "panda" or report.get("teacher_gate") != "passed" or report.get("robot_id") != robot
             or report.get("baseline", {}).get("attempts") != 100
             or report.get("baseline", {}).get("successes", 0) < 95
             or report.get("input_hashes") != input_hashes()
-            or report.get("teacher_config") != config):
-        raise ValueError("Formal collection requires matching frozen 100-seed teacher acceptance with >=95 successes")
+            or report.get("teacher_config") != config
+            or not matching_teachers_passed(report, report.get("compatibility", {}))):
+        raise ValueError("Formal collection requires matching frozen 100-seed acceptance and all physical teacher checks for both robots")
 
 
-def dataset_statistics(directory):
+def dataset_statistics(directory, *, config=None, robot=None, replay=False):
     directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
     counts, recovery_counts, groups, seeds = {}, {}, {}, {}
     mean, m2, count = None, None, 0
     manifests = sorted(directory.glob("*/*/manifest.json"))
     episodes = []
+    version = None
     for path in manifests:
         m, a = load_episode(path.parent)
+        current = (m["robot_id"], m["observation_schema"], m["teacher_config"], m["input_hashes"])
+        if version is None:
+            version = current
+        elif current != version:
+            raise ValueError("Dataset contains mixed robot/schema/teacher/input versions")
+        if config is not None and (m["teacher_config"] != config or m["input_hashes"] != input_hashes()
+                                   or m["robot_id"] != robot):
+            raise ValueError("Dataset does not match frozen teacher inputs")
         if m["segments"] != annotate(m["events"]):
             raise ValueError("Episode recovery annotations do not match physical events")
         if (m["accepted_normal"] != m["success"]
                 or m["accepted_recovery"] != any(s["recovery_valid"] for s in m["segments"])):
             raise ValueError("Episode selection flags do not match outcomes")
         split = m["split"]
+        if split not in ("train", "validation", "test"):
+            raise ValueError("Formal dataset contains a non-dataset split")
         group, seed = m["group_id"], m["seed"]
         if (group in groups and groups[group] != split) or (seed in seeds and seeds[seed] != split):
             raise ValueError("Episode recipe/seed leaked across splits")
@@ -68,7 +83,10 @@ def dataset_statistics(directory):
                 count += len(x)
         episodes.append(dict(path=str(path.parent.relative_to(directory)), seed=seed, split=split,
                              normal=normal, recovery=recovery, failure_reason=m["failure_reason"]))
-    summary = dict(schema_version=1, counts=counts, recovery_counts=recovery_counts, attempts=len(episodes), episodes=episodes)
+        if replay:
+            episodes[-1]["replay"] = replay_episode(path.parent)
+    summary = dict(schema_version=1, status="incomplete", counts=counts, recovery_counts=recovery_counts, attempts=len(episodes), episodes=episodes,
+                   replay_status="passed" if replay and episodes else "not_verified")
     write_json(directory / "statistics.json", summary)
     if count:
         raw_std = np.sqrt(m2/count)
@@ -82,14 +100,17 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--robot", choices=["panda", "ur5e"], default="panda")
     parser.add_argument("--config", default="configs/collect.json")
-    parser.add_argument("--gate", default="outputs/m4/panda/report.json")
+    parser.add_argument("--gate", default="outputs/new_tableware/v3/m4/panda/report.json")
     parser.add_argument("--output")
-    parser.add_argument("--viewer", action="store_true", help="Observe rollouts at up to 30 FPS without pacing physics")
+    display = parser.add_mutually_exclusive_group()
+    display.add_argument("--viewer", dest="viewer", action="store_true")
+    display.add_argument("--headless", dest="viewer", action="store_false")
+    parser.set_defaults(viewer=True)
     parser.add_argument("--train-episodes", type=int, help="Override train quota, e.g. 1000; held-out quotas unchanged")
     args = parser.parse_args()
     config = json.loads((ROOT / args.config).read_text())
     check_gate(json.loads((ROOT / args.gate).read_text()), config, args.robot)
-    directory = ROOT / (args.output or f"datasets/m4/{args.robot}")
+    directory = ROOT / (args.output or f"datasets/new_tableware/v3/m4/{args.robot}")
     directory.mkdir(parents=True, exist_ok=True)
     quotas = dict(config["quotas"])
     if args.train_episodes is not None:
@@ -104,7 +125,8 @@ def main():
                 episode = directory / split / f"{'recovery' if recover else 'normal'}_{seed}"
                 if episode.exists():
                     result, _ = load_episode(episode)
-                    if result["input_hashes"] != input_hashes() or result["teacher_config"] != config:
+                    if (result["input_hashes"] != input_hashes() or result["teacher_config"] != config
+                            or result["robot_id"] != args.robot):
                         raise ValueError("Cannot resume collection with changed teacher/source")
                 else:
                     result = run_episode(args.robot, seed, config, episode, scenario=scenario,
@@ -115,9 +137,9 @@ def main():
                 if accepted >= quota:
                     break
             if accepted < quota:
-                dataset_statistics(directory)
+                dataset_statistics(directory, config=config, robot=args.robot, replay=True)
                 raise RuntimeError(f"Quota unmet: {split}, recovery={recover}, {accepted}/{quota}")
-    summary = dataset_statistics(directory)
+    summary = dataset_statistics(directory, config=config, robot=args.robot, replay=True)
     summary["status"] = "passed"
     summary["quotas"] = quotas
     write_json(directory / "statistics.json", summary)

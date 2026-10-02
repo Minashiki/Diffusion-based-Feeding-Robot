@@ -20,15 +20,17 @@ def replay_episode(directory, *, viewer=False):
     if {k: v for k, v in manifest["input_hashes"].items() if k != replay_source} != {
             k: v for k, v in current_hashes.items() if k != replay_source}:
         raise ValueError("Replay requires the recorded source/configuration hashes")
-    env = FeedingGymEnv(manifest["robot_id"], timestep=manifest["dt"], render_mode="human" if viewer else None,
+    env = FeedingGymEnv(manifest["robot_id"], timestep=manifest["dt"],
                        max_episode_s=manifest["max_episode_s"])
     env.task.model.opt.iterations = manifest["solver_iterations"]
+    env.task.model.opt.tolerance = manifest["solver_tolerance"]
     env.reset(seed=manifest["seed"], options={"scenario": manifest["scenario"]})
     # Only load snapshots generated locally by this project, never untrusted pickle files.
     env.task.set_state(pickle.loads((directory / "initial_state.pkl").read_bytes()))
     task = env.task
     commands = json.loads((directory / "commands.json").read_text())
     cursor, obs_cursor, max_obs, max_reference = 0, 0, 0., 0.
+    display = None
     def compare_observation():
         nonlocal obs_cursor, max_obs
         if obs_cursor < len(arrays["observation_ticks"]) and task.tick == arrays["observation_ticks"][obs_cursor]:
@@ -38,6 +40,11 @@ def replay_episode(directory, *, viewer=False):
                 raise AssertionError("Replay phase mismatch")
             obs_cursor += 1
     try:
+        if viewer:
+            from feedingrobot.sim.observer_viewer import ObserverViewer
+            display = ObserverViewer(task.model,task.data)
+            if display.start()["status"] != "running":
+                raise RuntimeError("Replay viewer is unavailable; physical viewer check remains unverified")
         compare_observation()
         for index in range(manifest["physics_rows"]):
             while cursor < len(commands) and commands[cursor]["tick"] == task.tick:
@@ -67,7 +74,7 @@ def replay_episode(directory, *, viewer=False):
                         and arrays["observation_ticks"][obs_cursor + 1] == task.tick)):
                 compare_observation()
             if viewer and task.tick % round(.02 / task.dt) == 0:
-                env.render()
+                display.update(phase=task.logic.phase, result=task.failure_reason or ("success" if task.logic.success else "running"))
         while cursor < len(commands) and commands[cursor]["tick"] == task.tick:
             if commands[cursor]["kind"] != "stop":
                 raise AssertionError("Unexpected command after final physics row")
@@ -80,9 +87,15 @@ def replay_episode(directory, *, viewer=False):
         assert task.logic.events == manifest["events"], "Replay event mismatch"
         assert task.logic.success == manifest["success"] and task.failure_reason == manifest["failure_reason"]
         assert max_obs <= 1e-7 and max_reference <= 1e-10, (max_obs, max_reference)
+        visualization = display.close() if display else dict(status="disabled")
+        if viewer and (not visualization.get("displayed_frames") or visualization.get("reason") != "episode_finished"):
+            raise AssertionError("Full replay viewer did not display and complete the episode")
         return dict(status="passed", episode=str(directory), max_observation_error=max_obs,
+                    visualization=visualization,
                     max_physics_reference_error=max_reference, events_equal=True, result_equal=True,
                     replay_source_hash=current_hashes[replay_source],
                     recorded_replay_source_hash=manifest["input_hashes"][replay_source])
     finally:
+        if display:
+            display.close()
         env.close()

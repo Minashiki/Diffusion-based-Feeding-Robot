@@ -27,11 +27,12 @@ def _display(model, initial_state, frames, messages, ready, stop):
             ready.set()
             while not stop.is_set() and viewer.is_running():
                 try:
-                    state = frames.get(timeout=.05)
+                    state, label = frames.get(timeout=.05)
                 except queue.Empty:
                     continue
                 mujoco.mj_setState(model, data, state, state_spec)
                 mujoco.mj_forward(model, data)
+                viewer.set_texts((None, None, "FeedingRobot", label))
                 viewer.sync(state_only=True)
                 displayed += 1
             messages.put(dict(status="closed", reason="episode_finished" if stop.is_set() else "window_closed",
@@ -88,7 +89,7 @@ class ObserverViewer:
         if self.process.exitcode is not None and self.report["status"] in ("starting", "running"):
             self.report.update(status="unavailable", reason=f"viewer_process_exit:{self.process.exitcode}")
 
-    def update(self):
+    def update(self, *, phase=None, result=None, training_step=None):
         if self.closed or self.process is None or self.process.pid is None:
             return
         self._messages()
@@ -99,7 +100,12 @@ class ObserverViewer:
             return
         self.last_frame = now
         try:
-            self.frames.put_nowait(self._state())
+            label = f"phase={phase or '-'}"
+            if training_step is not None:
+                label += f" | training step={training_step}"
+            if result is not None:
+                label += f" | {result}"
+            self.frames.put_nowait((self._state(), label))
             self.sent_frames += 1
         except queue.Full:
             pass
@@ -123,3 +129,31 @@ class ObserverViewer:
         self.report["sent_frames"] = self.sent_frames
         self.closed = True
         return self.report.copy()
+
+    def apply_training_budget(self, measurement):
+        self.report["performance"] = measurement
+        if not measurement["enabled"]:
+            self.close()
+            self.report.update(status="disabled", reason=measurement["reason"])
+        return self.report.copy()
+
+
+def benchmark_visualization(run_window):
+    """Caller restores the same checkpoint/data/state and equal work per window.
+
+    Warmup is excluded. Training entrypoints use the returned enabled flag to
+    close their observer permanently for this run when overhead exceeds 50%.
+    """
+    for visible in (False, True):
+        run_window(viewer=visible, warmup=True)
+    samples = {False: [], True: []}
+    for pair in range(3):
+        for visible in ((False, True) if pair % 2 == 0 else (True, False)):
+            start = time.monotonic()
+            run_window(viewer=visible, warmup=False)
+            samples[visible].append(time.monotonic()-start)
+    headless, visible = (float(np.median(samples[key])) for key in (False, True))
+    ratio = visible/headless
+    return dict(headless_windows_s=samples[False], visible_windows_s=samples[True],
+                headless_median_s=headless, visible_median_s=visible, time_ratio=ratio,
+                enabled=ratio <= 1.5, reason="overhead_exceeds_50_percent" if ratio > 1.5 else "within_budget")
