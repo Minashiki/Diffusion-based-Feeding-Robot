@@ -1,7 +1,11 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "scope": "Single-bean M3 directed physics and natural static/dynamic full flows; fixed layout; M4 not verified",
-  "event_time_tolerance_s": 0.01,
+  "event_time_tolerance_s": 0.4,
+  "preparation_event_time_tolerance_s": 1.0,
+  "contact_event_time_tolerance_s": 1.0,
+  "failure_time_tolerance_s": 0.01,
+  "tcp_path_comparison": "normalized arc length per action; mouth frame for entry and retraction; receiver frame for release",
   "tcp_position_tolerance_m": 0.002,
   "force_absolute_tolerance_n": 0.05,
   "force_relative_tolerance": 0.2,

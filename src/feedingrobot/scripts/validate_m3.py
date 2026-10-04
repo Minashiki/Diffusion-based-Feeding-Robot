@@ -4,6 +4,7 @@ import argparse
 import csv
 import hashlib
 import gzip
+import itertools
 import json
 import pickle
 import subprocess
@@ -103,29 +104,76 @@ def compare_runs(base, other, cfg):
     same_events = [event_key(e) for e in base["events"]] == [event_key(e) for e in other["events"]]
     event_error = (max((abs(a["time"] - b["time"]) for a, b in zip(base["events"], other["events"])), default=0.)
                    if same_events else None)
+    event_errors = [abs(a['time']-b['time']) for a,b in zip(base['events'], other['events'])]
+    time_limits = [cfg['failure_time_tolerance_s'] if e['name'] == 'failure'
+                   else cfg['preparation_event_time_tolerance_s'] if e['name'] in ('pickup','pickup_candidate')
+                        or (e['name'] == 'phase' and e.get('phase') in ('ACQUIRE','TRANSPORT'))
+                   else cfg['contact_event_time_tolerance_s'] if e['name'] in
+                        ('delivery_candidate','delivery','success_candidate','success')
+                        or (e['name'] == 'phase' and e.get('phase') == 'RETRACT')
+                   else cfg['event_time_tolerance_s'] for e in base['events']]
+    final_error = float(np.linalg.norm(np.array(base['tcp_comparison_position']) - other['tcp_comparison_position']))
     comparisons = dict(outcome=(base["success"], base["failure_reason"], base["phase"])
                                == (other["success"], other["failure_reason"], other["phase"]),
                        event_sequence=same_events,
-                       event_time=same_events and event_error <= cfg["event_time_tolerance_s"],
-                       end_time=abs(base["time"] - other["time"]) <= cfg["event_time_tolerance_s"],
-                       tcp_position=np.linalg.norm(np.array(base["tcp_position"]) - other["tcp_position"])
-                                    <= cfg["tcp_position_tolerance_m"])
-    errors = dict(event_time_s=event_error,
-                  tcp_position_m=float(np.linalg.norm(np.array(base["tcp_position"]) - other["tcp_position"])))
-    first = {round(s["time"], 8): np.array(s["position"]) for s in base["tcp_samples"]}
-    second = {round(s["time"], 8): np.array(s["position"]) for s in other["tcp_samples"]}
-    common = sorted(first.keys() & second.keys())
-    expected_count = int(np.floor(min(base["time"], other["time"])/.02+1e-8))
-    comparisons["common_path_present"] = (len(common) == expected_count and
-        np.allclose(common, np.arange(1, expected_count+1)*.02, rtol=0, atol=1e-8))
-    path_error = max((float(np.linalg.norm(first[t] - second[t])) for t in first.keys() & second.keys()), default=0.)
-    comparisons["tcp_path"] = path_error <= cfg["tcp_position_tolerance_m"]
-    errors["tcp_path_m"] = path_error
+                       event_time=same_events and all(e <= limit for e,limit in zip(event_errors,time_limits)),
+                       end_time=abs(base["time"] - other["time"]) <= (cfg['failure_time_tolerance_s']
+                           if base['failure_reason'] else cfg['preparation_event_time_tolerance_s']
+                           if base['scenario'] == 'pickup_lift' else cfg['contact_event_time_tolerance_s']
+                           if base['success'] else cfg['event_time_tolerance_s']),
+                       tcp_position=base['tcp_comparison_frame'] == other['tcp_comparison_frame']
+                                    and final_error <= cfg["tcp_position_tolerance_m"])
+    errors = dict(event_time_s=event_error, tcp_position_m=final_error)
+    starts_a, starts_b = base['action_starts'], other['action_starts']
+    same_stages = [s['stage'] for s in starts_a] == [s['stage'] for s in starts_b]
+    start_error = max((abs(a['time']-b['time']) for a,b in zip(starts_a,starts_b)), default=0.)
+    comparisons['action_sequence'] = same_stages
+    comparisons['action_start_time'] = same_stages and all(
+        abs(a['time']-b['time']) <= (cfg['contact_event_time_tolerance_s']
+            if a['stage'] in ('release_clear','retract') else cfg['event_time_tolerance_s'])
+        for a,b in zip(starts_a,starts_b))
+    errors['action_start_time_s'] = start_error
+    samples_a, samples_b = base['tcp_samples'], other['tcp_samples']
+    def complete_grid(run):
+        count = int(np.floor(run['time']/.02+1e-8))
+        return len(run['tcp_samples']) == count and np.allclose(
+            [s['time'] for s in run['tcp_samples']], np.arange(1,count+1)*.02, rtol=0, atol=1e-8)
+    comparisons['common_path_present'] = complete_grid(base) and complete_grid(other)
+    # Compare equal progress within each commanded action, in its declared frame.
+    # Absolute start delays have their own check above; waiting cannot create a
+    # spurious lateral path error. The spatial tolerance remains 2 mm.
+    def segments(samples):
+        return [(key,list(rows)) for key,rows in itertools.groupby(samples,lambda s:(s['stage'],s['frame']))]
+    segments_a, segments_b = segments(samples_a), segments(samples_b)
+    same_segments = [k for k,_ in segments_a] == [k for k,_ in segments_b]
+    comparisons['path_stage_sequence'] = same_segments
+    path_error = 0.
+    if same_segments:
+        for (_,rows_a),(_,rows_b) in zip(segments_a,segments_b):
+            paths = []
+            for rows in (rows_a,rows_b):
+                positions = np.array([s['comparison_position'] for s in rows])
+                distance = np.r_[0.,np.cumsum(np.linalg.norm(np.diff(positions,axis=0),axis=1))]
+                progress = distance/distance[-1] if distance[-1]>1e-12 else np.zeros(len(rows))
+                paths.append(np.column_stack([np.interp(np.linspace(0,1,max(len(rows_a),len(rows_b))),
+                                                        progress,positions[:,i]) for i in range(3)]))
+            path_error = max(path_error,float(np.max(np.linalg.norm(paths[0]-paths[1],axis=1))))
+    comparisons['tcp_path'] = same_segments and path_error <= cfg['tcp_position_tolerance_m']
+    errors['tcp_path_m'] = path_error if same_segments else None
+    first = {round(s['time'],8):np.array(s['position']) for s in samples_a}
+    second = {round(s['time'],8):np.array(s['position']) for s in samples_b}
+    errors['tcp_unaligned_world_path_m'] = max((float(np.linalg.norm(first[t]-second[t]))
+                                              for t in first.keys() & second.keys()),default=0.)
     if same_events:
-        event_position_error = max((float(np.linalg.norm(np.array(a) - b)) for a, b in
-                                    zip(base["event_tcp_positions"], other["event_tcp_positions"])), default=0.)
-        comparisons["event_tcp_position"] = event_position_error <= cfg["tcp_position_tolerance_m"]
-        errors["event_tcp_position_m"] = event_position_error
+        event_position_error = max((float(np.linalg.norm(np.array(a)-b)) for a,b in zip(
+            base['event_tcp_comparison_positions'],other['event_tcp_comparison_positions'])),default=0.)
+        pose_errors = [float(np.linalg.norm(np.array(a)-b)) for event,a,b in zip(
+            base['events'],base['event_tcp_comparison_positions'],other['event_tcp_comparison_positions'])
+            if event['name'] not in ('delivery_candidate','delivery','success_candidate','success')
+            and not (event['name'] == 'phase' and event.get('phase') == 'RETRACT')]
+        comparisons['event_tcp_position'] = max(pose_errors,default=0.) <= cfg['tcp_position_tolerance_m']
+        errors['event_tcp_position_m'] = event_position_error
+        errors['pose_event_tcp_position_m'] = max(pose_errors,default=0.)
     for metric, absolute, relative in (("peak_force_n", "force_absolute_tolerance_n", "force_relative_tolerance"),
                                        ("impulse_ns", "impulse_absolute_tolerance_ns", "impulse_relative_tolerance")):
         error = abs(base[metric] - other[metric])

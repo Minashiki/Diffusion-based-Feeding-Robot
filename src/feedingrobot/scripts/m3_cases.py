@@ -221,6 +221,7 @@ def physical_case(robot, scenario, timestep=.001, *, seed=0, iterations=100, ref
     if scenario == "force":
         env.task.set_external_wrench([0, 0, 12], [0, 0, 0], env.task.data.site_xpos[env.task.index.tcp])
     trace = []
+    action_starts = []
     # Capture every physical boundary, including contact geometry and F/T.
     step = env.task.step_physics
     def recorded_step(**kwargs):
@@ -231,12 +232,25 @@ def physical_case(robot, scenario, timestep=.001, *, seed=0, iterations=100, ref
         e = evidence(env.task)
         if driver:
             driver.record(env.task, before, radius)
+        mouth_frame = bool(driver and driver.lifted and driver.stage in
+                           ('wait_ready', 'recover', 'entry', 'release', 'retract'))
+        receiver_frame = bool(driver and driver.stage in ('release_lower', 'release_roll', 'release_clear'))
+        receiver = env.task.model.site('mouth_receiver').id
+        comparison_position = ((state['tcp_position']-env.task.data.site_xpos[receiver])
+                               @ env.task.data.site_xmat[receiver].reshape(3,3) if receiver_frame
+                               else (state['tcp_position']-e['mouth_position']) @ e['mouth_rotation'] if mouth_frame
+                               else state['tcp_position'])
         trace.append(dict(time=state["time"], phase=env.task.logic.phase, success=env.task.logic.success,
                           failure_reason=env.task.failure_reason, driver_stage=driver.stage if driver else scenario, events=env.task.logic.events[len_events[0]:].copy(),
                           **{k: e[k] for k in ("supported", "off_bowl", "on_bowl", "mouth_supported", "released",
                                                "tool_inside", "ready", "bowl_clearance_m", "spoon_support_force_n",
                                                "required_height_m", "required_width_m", "aperture_m")},
                           tcp_position=state["tcp_position"].tolist(), bean_position=state["bean_positions"][0].tolist(),
+                          tcp_comparison_position=comparison_position.tolist(),
+                          tcp_comparison_frame='receiver' if receiver_frame else 'mouth' if mouth_frame else 'world',
+                          mouth_position=e['mouth_position'].tolist(), mouth_rotation=e['mouth_rotation'].tolist(),
+                          receiver_position=env.task.data.site_xpos[receiver].tolist(),
+                          receiver_rotation=env.task.data.site_xmat[receiver].reshape(3,3).tolist(),
                           bean_quaternion=state["bean_quaternions"][0].tolist(),
                           bean_linear_velocity=state["bean_linear_velocities_world"][0].tolist(),
                           bean_angular_velocity=state["bean_angular_velocities_world"][0].tolist(),
@@ -275,6 +289,9 @@ def physical_case(robot, scenario, timestep=.001, *, seed=0, iterations=100, ref
         while env.task.data.time < duration - 1e-12:
             started = time.monotonic()
             action = driver.action(env.task) if driver else diagnostic_action(env.task)
+            stage = driver.stage if driver else scenario
+            if not action_starts or action_starts[-1]['stage'] != stage:
+                action_starts.append(dict(stage=stage, time=float(env.task.data.time)))
             if driver and driver.transfer_start is not None and transfer_state is None:
                 transfer_state = env.get_state()
             _, _, terminated, truncated, info = env.step(action)
@@ -315,14 +332,22 @@ def physical_case(robot, scenario, timestep=.001, *, seed=0, iterations=100, ref
                       contact_pair_peaks_n=env.task.monitor.pair_peaks.copy(),
                       contact_pair_impulses_ns=env.task.monitor.pair_impulses.copy(),
                       tcp_position=env.task.data.site_xpos[env.task.index.tcp].tolist(),
+                      tcp_comparison_position=trace[-1]['tcp_comparison_position'],
+                      tcp_comparison_frame=trace[-1]['tcp_comparison_frame'],
                       events=env.task.logic.events, reward_terms=rewards,
-                      tcp_samples=[dict(time=r["time"], position=r["tcp_position"]) for r in trace
+                      action_starts=action_starts,
+                      tcp_samples=[dict(time=r["time"], position=r["tcp_position"], stage=r['driver_stage'],
+                                        comparison_position=r['tcp_comparison_position'], frame=r['tcp_comparison_frame']) for r in trace
                                    if abs(r["time"] / .02 - round(r["time"] / .02)) < 1e-8],
                       event_tcp_positions=[next(r["tcp_position"] for r in trace
                                                 if abs(r["time"] - event["time"]) < 1e-10)
                                            for event in env.task.logic.events],
+                      event_tcp_comparison_positions=[next(r['tcp_comparison_position'] for r in trace
+                                                if abs(r['time'] - event['time']) < 1e-10)
+                                           for event in env.task.logic.events],
                       frames=frames, initial_state=initial_state, transfer_state=transfer_state,
                       first_entry_contact=driver.first_entry_contact if driver else None,
+                      transport_start=driver.transport_start if driver else None,
                       sweep_displacement_m=(driver.sweep_end-driver.sweep_start).tolist() if driver and driver.sweep_end is not None else None,
                       food_pulse=dict(force_mouth_n=[-.1, 0, .3], duration_s=.2) if scenario == "post_delivery_loss" else None)
         failures = {"unsupported": "food_dropped", "bowl_return": "food_dropped", "receiver_outside": "food_dropped",
