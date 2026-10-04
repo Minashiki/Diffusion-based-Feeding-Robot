@@ -8,12 +8,13 @@ from feedingrobot.sim.model import load_json
 
 
 def sample(**overrides):
-    row = dict(supported=False, off_plate=False, on_plate=True, mouth_supported=False, released=True,
+    row = dict(supported=False, off_bowl=False, on_bowl=True, mouth_supported=False, released=True,
                tool_inside=False, tool_mouth_contact=False, at_wait=False, aligned=True, ready=True,
-               food_ground_contact=False, food_valid=True, penetration=False,
-               tcp_position=np.zeros(3), food_position=np.ones(3), mouth_position=np.ones(3),
+               food_ground_contact=False, food_valid=True, penetration=False, bean_penetration=False, pickup_eligible=False,
+               tcp_position=np.zeros(3), bean_position=np.ones(3), mouth_position=np.ones(3),
                wait_position=np.ones(3))
     row.update(overrides)
+    row["pickup_eligible"] = row["supported"] and row["off_bowl"]
     return row
 
 
@@ -32,8 +33,8 @@ def advance(logic, e, seconds, failure=None):
 
 
 def acquired(logic):
-    e = sample(on_plate=False, off_plate=True, supported=True, released=False)
-    advance(logic, e, .101)
+    e = sample(on_bowl=False, off_bowl=True, supported=True, released=False)
+    advance(logic, e, .501)
     assert logic.phase == "TRANSPORT"
     return e
 
@@ -75,13 +76,15 @@ def test_pickup_needs_contact_leave_plate_and_continuity(logic):
     e = sample(supported=True)
     advance(logic, e, .2)
     assert not logic.acquired
-    e.update(off_plate=True, on_plate=False)
-    advance(logic, e, .099)
+    e.update(off_bowl=True, on_bowl=False)
+    e["pickup_eligible"] = True
+    advance(logic, e, .499)
     assert not logic.acquired
     e["supported"] = False
     advance(logic, e, .001)
     e["supported"] = True
-    advance(logic, e, .099)
+    e["pickup_eligible"] = True
+    advance(logic, e, .499)
     assert not logic.acquired
     advance(logic, e, .001)
     assert logic.acquired
@@ -123,7 +126,7 @@ def test_wait_and_recovery_do_not_generate_motion(logic):
     assert logic.phase == "WAIT_READY"
 
 
-@pytest.mark.parametrize("kind", ["unsupported", "floor", "back_on_plate", "early_withdrawal", "post_delivery_loss"])
+@pytest.mark.parametrize("kind", ["unsupported", "floor", "back_on_bowl", "early_withdrawal", "post_delivery_loss"])
 def test_distinct_food_failures(logic, kind):
     e = transferring(logic)
     if kind == "early_withdrawal":
@@ -137,7 +140,7 @@ def test_distinct_food_failures(logic, kind):
     else:
         e.update(supported=False, released=True)
         e["food_ground_contact"] = kind == "floor"
-        e["on_plate"] = kind == "back_on_plate"
+        e["on_bowl"] = kind == "back_on_bowl"
         expected = "food_dropped"
     advance(logic, e, .1)
     assert logic.failure_reason == expected and not logic.success
@@ -152,7 +155,7 @@ def test_transfer_grace_and_no_empty_delivery(logic):
     advance(logic, e, .2)
     assert logic.delivered
     other = TaskEvents(logic.config)
-    advance(other, sample(on_plate=False, off_plate=True, mouth_supported=True), .3)
+    advance(other, sample(on_bowl=False, off_bowl=True, mouth_supported=True), .3)
     assert not other.acquired and not other.delivered
 
 

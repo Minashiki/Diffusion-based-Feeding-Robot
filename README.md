@@ -1,6 +1,9 @@
 # FeedingRobot DPRL — 单豆喂餐原型
 
-2026-10-03：默认场景切换为源勺、固定碗与一颗原生刚体 `bean_000`，模型版本 `single_bean_native_v1`。采用固定位置／姿态生成和自然沉降，Panda、UR5e 共用同一布局；本轮不验收随机布局。双机器人完整候选 M1 已通过；正式冻结以匹配当前输入的完整报告和清单为准。M3/M4 为 not_verified。
+2026-10-03：默认场景切换为源勺、固定碗与一颗原生刚体 `bean_000`，模型版本 `single_bean_native_v1`。采用固定位置／姿态生成和自然沉降，Panda、UR5e 共用同一布局；本轮不验收随机布局。双机器人完整候选 M1 已通过；正式冻结以匹配当前输入的完整报告和清单为准。M3 已接入单豆环境并进入重建验收；正式放行以新任务冻结清单为准，M4 为 not_verified。
+
+单豆 M3：`python -m feedingrobot.scripts.validate_m3 --robot all`，双机器人静态及动态完整流程、定向物理矩阵、数值对照、viewer 和完整 M1 回归通过后，才在 `outputs/single_bean/v1/m3/` 生成冻结清单。接口见 [M3 契约](docs/m3_interfaces.md)。零动作环境演示：`python -m feedingrobot.scripts.demo_m3 --robot panda --preset beans_in_bowl`。M3 证明驱动不作为 M4 教师放行证据。
+
 
 ```bash
 conda run -n feedingrobot python -m feedingrobot.scripts.validate_m1 --robot all

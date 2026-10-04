@@ -164,9 +164,14 @@ def test_complete_state_and_schema_rejection(task):
         task.reset(scenario={'food_mass_kg': .005})
 
 
-def test_task_mode_is_not_silently_migrated():
-    with pytest.raises(NotImplementedError, match='M3/M4'):
-        FeedingTask(task_mode=True)
+def test_task_mode_uses_single_bean_and_new_snapshot_rules():
+    task = FeedingTask(task_mode=True)
+    assert task.index.bean_ids == ('bean_000',)
+    assert task.logic.phase == 'SELECT'
+    assert task.state_signature()['schema_version'] == 4
+    assert task.state_signature()['event_rules_version'] == 3
+    assert task.provider.observe()['policy_obs']['bean_relative_world'].shape == (1, 3)
+    assert task.reset_diagnostics['preset'] == 'beans_in_bowl'
 
 
 def test_single_spawn_clearance_has_no_bean_pairs(task):

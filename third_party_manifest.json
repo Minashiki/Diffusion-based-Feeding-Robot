@@ -1055,7 +1055,7 @@
     },
     {
       "path": "configs/task.json",
-      "sha256": "bfb3b2a0f8eec88bd6b381b76f4855c5a1cadc7b36c15f84d243b2ec4388e370"
+      "sha256": "f49cbc7846017d434366fb9b382cc7ef7f883e185ed1c63ec816f377bcab67f8"
     },
     {
       "path": "configs/acceptance.json",

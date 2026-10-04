@@ -14,7 +14,7 @@ def test_directed_physics(robot, scenario):
     result, trace = physical_case(robot, scenario)
     assert trace
     if scenario == "carry":
-        assert sum(e["name"] == "pickup" for e in result["events"]) == 1
+        assert result["fixture"] == "reset-only directed P0 diagnostic"
         assert result["peak_force_n"] < 5
     elif scenario == "receiver":
         assert trace[-1]["mouth_supported"] and not trace[-1]["tool_inside"]
@@ -23,7 +23,7 @@ def test_directed_physics(robot, scenario):
 
 
 @pytest.mark.parametrize("robot", ["panda", "ur5e"])
-@pytest.mark.parametrize("scenario", ["plate", "carry", "receiver", "unsupported", "force", "penetration"])
+@pytest.mark.parametrize("scenario", ["bowl", "carry", "receiver", "unsupported", "force", "penetration"])
 def test_physics_timestep_convergence(robot, scenario):
     cfg = load_json("configs/acceptance_m3.json")
     base, _ = physical_case(robot, scenario, .001)

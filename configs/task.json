@@ -1,9 +1,9 @@
 {
-  "schema_version": 1,
-  "scope": "M3 P0 simulation criteria; not human safety limits",
+  "schema_version": 2,
+  "scope": "Single-bean M3 P0 task; M1 physical limits unchanged",
   "control_dt_s": 0.02,
   "max_episode_s": 60.0,
-  "support_confirm_s": 0.1,
+  "support_confirm_s": 0.5,
   "delivery_confirm_s": 0.2,
   "retract_confirm_s": 0.1,
   "ready_confirm_s": 0.1,
@@ -14,17 +14,6 @@
   "position_tolerance_m": 0.01,
   "orientation_tolerance_rad": 0.1,
   "clearance_margin_m": 0.002,
-  "spoon_support_min_m": [
-    -0.018435,
-    -0.012777,
-    -0.001
-  ],
-  "spoon_support_max_m": [
-    0.02038,
-    0.012745,
-    0.03
-  ],
-  "plate_clearance_m": 0.002,
   "contact_min_force_n": 1e-05,
   "interaction_min_m": [
     0.0,

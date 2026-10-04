@@ -5,7 +5,6 @@ import csv
 import hashlib
 import gzip
 import json
-import os
 import pickle
 import subprocess
 import sys
@@ -17,9 +16,11 @@ import numpy as np
 
 from feedingrobot.envs import FeedingGymEnv
 from feedingrobot.scripts.m3_cases import physical_case, PHYSICAL_CASES
-from feedingrobot.sim.model import ROOT, asset_files, load_json
+from feedingrobot.sim.model import ROOT, load_json
+from feedingrobot.scripts.validate_m1 import input_hashes, validate as validate_m1
 
-CASES = ("event_logic", "environment", "snapshot") + PHYSICAL_CASES + ("convergence", "viewer")
+FULL_CASES = ("full_static", "full_dynamic")
+CASES = ("event_logic", "environment", "geometry", "snapshot") + PHYSICAL_CASES + FULL_CASES + ("convergence", "viewer", "m1_regression", "manifest")
 
 
 def json_value(value):
@@ -35,8 +36,9 @@ def write_json(path, value):
 
 
 def pytest_case(robot, name, output):
-    test = "test_m3_events.py" if name == "event_logic" else "test_m3_env.py"
-    command = [sys.executable, "-m", "pytest", "-q", str(ROOT / "tests" / test),
+    tests = {"event_logic": ["test_m3_events.py", "test_m3_acceptance.py"], "environment": ["test_m3_env.py"],
+             "geometry": ["test_m3_geometry.py", "test_receiver_boundary.py"]}[name]
+    command = [sys.executable, "-m", "pytest", "-q", *[str(ROOT / "tests" / test) for test in tests],
                f"--junitxml={output / (name + '.xml')}"]
     if name == "environment":
         command += ["-k", "not " + ("ur5e" if robot == "panda" else "panda")]
@@ -52,7 +54,7 @@ def pytest_case(robot, name, output):
 def snapshot_case(robot, output):
     env = FeedingGymEnv(robot)
     try:
-        env.reset(seed=17, options={"preset": "food_on_spoon"})
+        env.reset(seed=17, options={"preset": "beans_on_spoon"})
         for _ in range(8):
             env.step(np.array([.05, 0, 0, 0, 0, 0]))
         # Trusted local binary artifact, including all numpy and generator state.
@@ -77,12 +79,16 @@ def snapshot_case(robot, output):
 
 def save_physics(output, result, trace):
     output.mkdir(parents=True, exist_ok=True)
-    write_json(output / "metrics.json", result)
+    if 'initial_state' in result:
+        (output / 'initial_state.pkl').write_bytes(pickle.dumps(result['initial_state'], protocol=5))
+    if result.get('transfer_state') is not None:
+        (output / 'transfer_state.pkl').write_bytes(pickle.dumps(result['transfer_state'], protocol=5))
+    write_json(output / "metrics.json", {k:v for k,v in result.items() if k not in ('initial_state','transfer_state')})
     with gzip.open(output / "physics.jsonl.gz", "wt") as file:
         for row in trace:
             file.write(json.dumps(row, default=json_value, allow_nan=False) + "\n")
-    fields = ("time", "phase", "failure_reason", "supported", "off_plate", "on_plate", "mouth_supported",
-              "released", "tool_inside", "ready", "plate_height_m", "spoon_support_force_n",
+    fields = ("time", "phase", "failure_reason", "supported", "off_bowl", "on_bowl", "mouth_supported",
+              "released", "tool_inside", "ready", "bowl_clearance_m", "spoon_support_force_n",
               "contact_peak_n", "contact_impulse_ns", "minimum_contact_distance_m")
     with (output / "trajectory.csv").open("w") as file:
         writer = csv.DictWriter(file, fieldnames=fields + ("tcp_x", "tcp_y", "tcp_z"))
@@ -108,6 +114,10 @@ def compare_runs(base, other, cfg):
                   tcp_position_m=float(np.linalg.norm(np.array(base["tcp_position"]) - other["tcp_position"])))
     first = {round(s["time"], 8): np.array(s["position"]) for s in base["tcp_samples"]}
     second = {round(s["time"], 8): np.array(s["position"]) for s in other["tcp_samples"]}
+    common = sorted(first.keys() & second.keys())
+    expected_count = int(np.floor(min(base["time"], other["time"])/.02+1e-8))
+    comparisons["common_path_present"] = (len(common) == expected_count and
+        np.allclose(common, np.arange(1, expected_count+1)*.02, rtol=0, atol=1e-8))
     path_error = max((float(np.linalg.norm(first[t] - second[t])) for t in first.keys() & second.keys()), default=0.)
     comparisons["tcp_path"] = path_error <= cfg["tcp_position_tolerance_m"]
     errors["tcp_path_m"] = path_error
@@ -134,114 +144,198 @@ def compare_runs(base, other, cfg):
 def convergence_case(robot, output, baselines=None):
     cfg = load_json("configs/acceptance_m3.json")
     runs, baselines = [], baselines or {}
-    for scenario in PHYSICAL_CASES:
+    def run(scenario, seed, folder, **kwargs):
+        try:
+            result, trace = physical_case(robot, scenario, seed=seed, **kwargs)
+            passed = True
+        except AssertionError as exc:
+            if not hasattr(exc, "metrics"):
+                raise
+            result, trace, passed = exc.metrics, exc.trace, False
+        save_physics(folder, result, trace)
+        return result, passed
+    for scenario in PHYSICAL_CASES + FULL_CASES:
         for seed in cfg["seeds"]:
             base = baselines.get((scenario, seed))
+            base_passed = True
             if base is None:
-                base, trace = physical_case(robot, scenario, seed=seed)
-                save_physics(output / scenario / str(seed) / "baseline", base, trace)
+                base, base_passed = run(scenario, seed, output / scenario / str(seed) / "baseline")
             for name, kwargs in (("half_dt", dict(timestep=.0005)),
                                  ("refined_solver", dict(iterations=200, refined=True))):
-                other, trace = physical_case(robot, scenario, seed=seed, **kwargs)
-                save_physics(output / scenario / str(seed) / name, other, trace)
+                other, other_passed = run(scenario, seed, output / scenario / str(seed) / name,
+                                         initial_state=base["initial_state"], **kwargs)
+                comparison = compare_runs(base, other, cfg)
+                comparison["checks"]["physical_cases_passed"] = base_passed and other_passed
+                comparison["passed"] = all(comparison["checks"].values())
                 runs.append(dict(scenario=scenario, seed=seed, variant=name,
-                                 baseline=base, alternative=other, comparison=compare_runs(base, other, cfg)))
+                                 baseline={k:v for k,v in base.items() if k not in ("initial_state", "transfer_state")},
+                                 alternative={k:v for k,v in other.items() if k not in ("initial_state", "transfer_state")},
+                                 comparison=comparison))
+                write_json(output / "comparisons.json", dict(runs=runs, criteria=cfg, comparisons=len(runs)))
                 print(robot, "convergence", scenario, seed, name,
-                      "passed" if runs[-1]["comparison"]["passed"] else "failed", flush=True)
+                      "passed" if comparison["passed"] else "failed", flush=True)
     result = dict(runs=runs, criteria=cfg, comparisons=len(runs))
     if not all(r["comparison"]["passed"] for r in runs):
-        error = AssertionError("Convergence mismatch; inspect comparison checks and physical traces")
+        error = AssertionError("Convergence mismatch; inspect all comparison checks and physical traces")
         error.metrics = result
         raise error
     return result
 
 
-def viewer_session(robot, output=None):
+def viewer_session(robot, output):
     results = []
-    for scenario in ("entry", "receiver"):
-        result, trace = physical_case(robot, scenario, viewer=True,
-                                     frame_output=output / scenario if output is not None else None)
-        if output is not None:
-            assert ("entry" in result["frames"] if scenario == "entry" else
-                    {"delivery", "retracted"}.issubset(result["frames"]))
-            save_physics(output / scenario, result, trace)
-        results.append(result)
-    return dict(open_sync_close=True, directed_cases=results, training_claim=False)
+    for scenario in FULL_CASES:
+        result, trace = physical_case(robot, scenario, viewer=True, frame_output=output / scenario)
+        assert {"pickup", "delivery", "retracted"}.issubset(result["frames"])
+        save_physics(output / scenario, result, trace)
+        results.append({k:v for k,v in result.items() if k not in ("initial_state", "transfer_state")})
+    return dict(open_sync_close=True, full_flows=results, training_claim=False)
 
 
 def viewer_case(robot, output):
-    # GLFW may terminate the process rather than raising. Keep report ownership
-    # in the parent so an unavailable desktop never discards other case results.
     command = [sys.executable, "-c",
                "from feedingrobot.scripts.validate_m3 import viewer_session; "
-               "import sys; from pathlib import Path; viewer_session(sys.argv[1], Path(sys.argv[2]))", robot, str(output / "viewer")]
+               "import sys; from pathlib import Path; viewer_session(sys.argv[1], Path(sys.argv[2]))",
+               robot, str(output / "viewer")]
     result = subprocess.run(command, cwd=ROOT, text=True, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, timeout=60)
+                            stderr=subprocess.STDOUT, timeout=300)
     (output / "viewer.log").write_text(result.stdout)
     if result.returncode:
         raise RuntimeError(f"Viewer subprocess exited {result.returncode}: {result.stdout}")
-    return dict(open_sync_close=True, directed_cases=["entry", "receiver"], training_claim=False)
+    return dict(open_sync_close=True, full_flows=FULL_CASES, training_claim=False)
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--robot", choices=["panda", "ur5e"], default="panda")
-    parser.add_argument("--cases", nargs="*", choices=CASES)
-    parser.add_argument("--output")
-    args = parser.parse_args()
-    output = ROOT / (args.output or f"outputs/new_tableware/v2/m3/{args.robot}")
+def parent_freeze_check():
+    path = ROOT / "outputs/single_bean/v1/m1/freeze_manifest.json"
+    parent = json.loads(path.read_text())
+    assert parent["status"] == "frozen" and parent["model_version"] == "single_bean_native_v1"
+    # Task code evolves; assets, initial pose, physics and M1 limits stay frozen.
+    fixed = {p:h for p,h in parent["input_sha256"].items()
+             if p.startswith(("assets/", "configs/robots/"))
+             or p in ("configs/scene.json", "configs/acceptance.json")}
+    for file, digest in fixed.items():
+        assert hashlib.sha256((ROOT / file).read_bytes()).hexdigest() == digest, file
+    for file, digest in parent["evidence_sha256"].items():
+        assert hashlib.sha256((ROOT / file).read_bytes()).hexdigest() == digest, file
+    return dict(status="passed", manifest=str(path.relative_to(ROOT)),
+                sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                physical_inputs=len(fixed), evidence_files=len(parent["evidence_sha256"]))
+
+
+def validate(robot, output, selected=None, expected_hashes=None):
     output.mkdir(parents=True, exist_ok=True)
-    inputs = sorted(set(list((ROOT / "src/feedingrobot").rglob("*.py"))
-                        + list((ROOT / "tests").glob("*.py")) + list((ROOT / "configs").rglob("*.json"))
-                        + asset_files(args.robot)
-                        + [ROOT / f"assets/robots/{args.robot}.xml", ROOT / "requirements.lock.txt",
-                           ROOT / "third_party_manifest.json", ROOT / "pyproject.toml", ROOT / "environment.yml"]))
-    env = FeedingGymEnv(args.robot)
+    chosen = set(CASES if selected is None else selected)
+    start_hashes = input_hashes()
+    parent = parent_freeze_check()
+    env = FeedingGymEnv(robot)
     write_json(output / "state_schema.json", env.schema)
-    report = dict(status="incomplete", model_version="new_tableware_v2", robot_id=args.robot,
-                  scope="M3 only; directed fixtures are not full feeding/teacher evidence",
+    report = dict(schema_version=2, status="incomplete", model_version="single_bean_native_v1",
+                  task_version="single_bean_m3_v1", robot_id=robot,
+                  scope="Fixed-layout single-bean M3; natural static/dynamic full flow; M4 not verified",
+                  stages={"M3":"not_verified", "M4":"not_verified"}, parent_m1=parent,
                   task_config=load_json("configs/task.json"), signature=env.task.state_signature(),
-                  input_hashes={str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs},
-                  cases={name: dict(status="not_verified") for name in CASES})
+                  input_hashes=start_hashes, cases={name:dict(status="not_verified") for name in CASES})
     env.close()
+    write_json(output / "report.json", report)
     baselines = {}
-    acceptance = load_json("configs/acceptance_m3.json")
     for name in CASES:
-        if args.cases is not None and name not in args.cases:
-            continue
-        if name == "viewer" and not os.environ.get("DISPLAY"):
-            report["cases"][name]["reason"] = "DISPLAY unavailable; run in desktop session"
+        if name not in chosen:
             continue
         started = time.monotonic()
         try:
-            if name in ("event_logic", "environment"):
-                result = pytest_case(args.robot, name, output)
+            if name in ("event_logic", "environment", "geometry"):
+                result = pytest_case(robot, name, output)
             elif name == "snapshot":
-                result = snapshot_case(args.robot, output)
+                result = snapshot_case(robot, output)
             elif name == "convergence":
-                result = convergence_case(args.robot, output, baselines)
+                result = convergence_case(robot, output / "convergence", baselines)
             elif name == "viewer":
-                result = viewer_case(args.robot, output)
+                result = viewer_case(robot, output)
+            elif name == "m1_regression":
+                result = validate_m1(robot, output / "m1_regression", expected_hashes=start_hashes)
+                assert result["status"] == "passed", "M1 regression failed; inspect m1_regression/m1d_report.json"
+            elif name == "manifest":
+                assert input_hashes() == start_hashes == (expected_hashes or start_hashes), "Input hash drift"
+                result = parent_freeze_check()
             else:
                 results = []
-                for seed in acceptance["seeds"]:
-                    result, trace = physical_case(args.robot, name, seed=seed)
+                for seed in load_json("configs/acceptance_m3.json")["seeds"]:
+                    try:
+                        result, trace = physical_case(robot, name, seed=seed)
+                        passed = True
+                        baselines[name, seed] = result
+                    except AssertionError as exc:
+                        if not hasattr(exc, "metrics"):
+                            raise
+                        result, trace, passed = exc.metrics, exc.trace, False
                     save_physics(output / name / str(seed) / "baseline", result, trace)
-                    baselines[name, seed] = result
-                    results.append(result)
-                result = dict(runs=results, seeds=acceptance["seeds"])
+                    results.append(dict(physical_passed=passed,
+                        **{k:v for k,v in result.items() if k not in ("initial_state", "transfer_state")}))
+                result = dict(runs=results)
+                if not all(r["physical_passed"] for r in results):
+                    error = AssertionError("Physical case failed; all seeds retained")
+                    error.metrics = result
+                    raise error
             report["cases"][name] = dict(status="passed", metrics=result)
         except Exception as exc:
             if hasattr(exc, "trace"):
                 save_physics(output / name / "failed", exc.metrics, exc.trace)
             report["cases"][name] = dict(status="failed", error=traceback.format_exc(),
-                                        **(dict(metrics=exc.metrics) if hasattr(exc, "metrics") else {}))
-        report["cases"][name]["wall_seconds"] = time.monotonic() - started
-        print(args.robot, name, report["cases"][name]["status"], flush=True)
+                **(dict(metrics={k:v for k,v in exc.metrics.items() if k not in ("initial_state", "transfer_state")})
+                   if hasattr(exc, "metrics") else {}))
+        report["cases"][name]["wall_seconds"] = time.monotonic()-started
+        print(robot, name, report["cases"][name]["status"], flush=True)
         write_json(output / "report.json", report)
-    report["status"] = "passed" if all(c["status"] == "passed" for c in report["cases"].values()) else "incomplete"
+    report["final_input_hashes"] = input_hashes()
+    report["hashes_unchanged"] = start_hashes == report["final_input_hashes"] == (expected_hashes or start_hashes)
+    if not report["hashes_unchanged"]:
+        report["cases"]["manifest"] = dict(status="failed", error="Input hash drift")
+    statuses = [c["status"] for c in report["cases"].values()]
+    report["status"] = "passed" if all(s == "passed" for s in statuses) else "failed" if "failed" in statuses else "incomplete"
+    report["stages"]["M3"] = report["status"]
     write_json(output / "report.json", report)
-    if report["status"] != "passed":
+    return report
+
+
+def publish_freeze(reports, output, expected):
+    assert set(reports) == {"panda", "ur5e"}
+    assert input_hashes() == expected
+    parent = parent_freeze_check()
+    for report in reports.values():
+        assert report["status"] == "passed" and report["hashes_unchanged"]
+        assert report["input_hashes"] == report["final_input_hashes"] == expected
+        assert all(report["cases"][n]["status"] == "passed" for n in CASES)
+        assert report["stages"]["M4"] == "not_verified"
+    files = {str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest()
+             for robot in reports for p in sorted((output/robot).rglob('*')) if p.is_file()}
+    manifest = dict(schema_version=1, status="frozen", model_version="single_bean_native_v1",
+                    task_version="single_bean_m3_v1", parent_m1=parent, input_sha256=expected,
+                    evidence_sha256=files, acceptance=load_json("configs/acceptance_m3.json"),
+                    reports={r:str((output/r/'report.json').relative_to(ROOT)) for r in reports},
+                    stages={"M1-A":"passed", "M1-B":"passed", "M1-C":"passed", "M1-D":"passed",
+                            "M3":"passed", "M4":"not_verified"})
+    assert input_hashes() == expected
+    write_json(output/'freeze_manifest.json', manifest)
+    for file, digest in files.items():
+        assert hashlib.sha256((ROOT/file).read_bytes()).hexdigest() == digest, file
+    write_json(output/'freeze_audit.json', dict(status="passed", input_files=len(expected),
+               verified_evidence_files=len(files), parent_m1=parent, stages=manifest["stages"]))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--robot", choices=["panda", "ur5e", "all"], default="panda")
+    parser.add_argument("--cases", nargs="+", choices=CASES)
+    parser.add_argument("--output")
+    args = parser.parse_args()
+    output = ROOT / (args.output or "outputs/single_bean/v1/m3")
+    expected = input_hashes()
+    robots = ("panda", "ur5e") if args.robot == "all" else (args.robot,)
+    reports = {r:validate(r, output/r, args.cases, expected) for r in robots}
+    if all(r["status"] == "passed" for r in reports.values()):
+        if args.robot == "all" and args.cases is None:
+            publish_freeze(reports, output, expected)
+    else:
         raise SystemExit(1)
 
 

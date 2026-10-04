@@ -1,8 +1,16 @@
 # 单豆喂餐原型验收
 
-当前模型为 `single_bean_native_v1`，只编译 bean_000，固定布局自然沉降，Panda／UR5e 顺序执行。正式必需矩阵、原门槛和冻结流程见 [单豆 M1 方案](m1_beans_rebuild_plan.md)。单豆版双机器人完整候选 M1 已通过，最终冻结以匹配当前输入的报告和清单确认；M3/M4 not_verified，旧模型成绩不迁移。
+当前模型为 `single_bean_native_v1`，只编译 bean_000，固定布局自然沉降，Panda／UR5e 顺序执行。正式必需矩阵、原门槛和冻结流程见 [单豆 M1 方案](m1_beans_rebuild_plan.md)。单豆版双机器人完整候选 M1 已通过，最终冻结以匹配当前输入的报告和清单确认；M3 进入重建验收，M4 not_verified，旧模型成绩不迁移。
 
 当前报告使用 `outputs/single_bean/v1/m1/`，最终放行凭双机器人完整报告及同目录 `freeze_manifest.json`；历史失败输出保持。seeds 0–9 与 0–2 只验证固定布局重复性。双豆接触不属于正式验收，独立回归保留。
+## 单豆 M3 重建验收
+
+M3 任务版本为 `single_bean_m3_v1`，沿用冻结单豆物理输入。当前验收入口为 `python -m feedingrobot.scripts.validate_m3 --robot all`；双机器人顺序执行，最终状态由 `outputs/single_bean/v1/m3/freeze_manifest.json` 和 `freeze_audit.json` 确认。未生成匹配当前输入的完整冻结清单前，M3 不放行；M4 保持 not_verified。
+
+要求双机器人静态／动态完整流程各 seeds 0/1/2 全部成功；21 类定向物理用例及两个完整流程均进行共同初态的半步长和加倍求解精度对照。pickup 使用 0.5 s 原低速承载条件，Bean 穿透上限 0.4 mm，5 N／8 N 保护不变。checker、精确椭球几何、快照重放、成功／失败事件、viewer 与完整 M1 回归均为必需项，见 [M3 契约](m3_interfaces.md)。
+
+原 M1 报告及其输入／证据哈希作为历史冻结基线保留，不覆写。M3 源码和文档改动形成新输入集合，完整 M1 回归报告以这一集合重新生成；M3 清单关联原 M1 清单 SHA256，复核资产、物理参数、初态与原证据没有变化。
+
 ## 单豆 M1 完整候选结果
 
 双机器人各 20/20 必需项通过，M1-A/B/C/D 均 passed，viewer 开启／同步／关闭通过。相关回归 137 项通过；两机器人各 100 次 reset 最大状态差为 0；三组共同初态共 60 个沉降用例通过。三组设置、seeds 0/1/2 共 18 次真实舀取均通过。M3/M4 保持 not_verified。

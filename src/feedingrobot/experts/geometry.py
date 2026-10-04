@@ -12,6 +12,8 @@ from feedingrobot.sim.model import named_id
 
 
 def teacher_geometry(task):
+    if task.index.bean_ids:
+        raise NotImplementedError("Single-bean M4 teacher migration is pending; use the M3 proof driver for task validation")
     model, data, index = task.model, task.data, task.index
     plate = named_id(model, mujoco.mjtObj.mjOBJ_SITE, "plate_frame")
     tcp = data.site_xpos[index.tcp]

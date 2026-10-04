@@ -36,14 +36,14 @@ class FeedingGymEnv(gym.Env):
         n = self.task.index.n
         self.fields = [("q", n, "rad"), ("dq", n, "rad/s"), ("tcp_position", 3, "m"),
                        ("tcp_rotation", 9, "rotation matrix row-major"), ("tcp_twist_world", 6, "m/s, rad/s"),
-                       ("food_relative_world", 3, "m"), ("mouth_relative_world", 3, "m"),
+                       ("bean_relative_world", 3, "m"), ("mouth_relative_world", 3, "m"),
                        ("mouth_rotation", 9, "rotation matrix row-major"), ("mouth_aperture_m", 1, "m"),
                        ("raw_wrench_sensor", 6, "N, Nm"), ("wrench_world_at_tcp", 6, "N, Nm"),
                        ("compensated_wrench", 6, "N, Nm"), ("stage", len(PHASES), "one-hot"),
                        ("interaction", 4, "boolean"), ("execution_status", len(EXECUTION_STATES), "one-hot"),
                        ("frame_age_s", 1, "s")]
         self.observation_space = gym.spaces.Box(-np.inf, np.inf, (sum(f[1] for f in self.fields),), dtype=np.float32)
-        self.schema = dict(version=1, robot_id=robot_id, fields=self.fields, phases=PHASES,
+        self.schema = dict(version=2, robot_id=robot_id, fields=self.fields, phases=PHASES,
                            execution_states=EXECUTION_STATES,
                            interaction=("spoon_support", "mouth_support", "tool_mouth_contact", "ready"))
         self.viewer_context = self.viewer = None
@@ -80,9 +80,9 @@ class FeedingGymEnv(gym.Env):
             raise ValueError("Only reset options 'preset' and 'scenario' are supported")
         actual_seed = int(seed) if seed is not None else int(self.np_random.integers(0, 2**31))
         if "scenario" in options:
-            self.task.reset(actual_seed, options.get("preset", "food_on_plate"), scenario=options["scenario"])
+            self.task.reset(actual_seed, options.get("preset", "beans_in_bowl"), scenario=options["scenario"])
         else:
-            self.task.reset(actual_seed, options.get("preset", "food_on_plate"))
+            self.task.reset(actual_seed, options.get("preset", "beans_in_bowl"))
         self.steps, self.done = 0, False
         self.step_metrics = {}
         self.last_observation = self._observation()
@@ -116,7 +116,7 @@ class FeedingGymEnv(gym.Env):
             task.step_physics()
             self.step_metrics["contact_peak_n"] = max(self.step_metrics["contact_peak_n"], task.substep_contact_peak_n)
             self.step_metrics["wrist_peak_n"] = max(self.step_metrics["wrist_peak_n"], task.substep_wrist_peak_n)
-            if task.terminated or task.data.time + 1e-12 >= self.max_episode_s:
+            if task.terminated or task.tick * task.dt + 1e-12 >= self.max_episode_s:
                 break
         elapsed = float(task.data.time) - start
         self.step_metrics.update(contact_impulse_ns=task.monitor.impulse_ns - impulse,
@@ -149,7 +149,7 @@ class FeedingGymEnv(gym.Env):
                 logic.awarded.add(name)
         self.steps += 1
         terminated = bool(task.terminated)
-        truncated = bool(not terminated and task.data.time + 1e-12 >= self.max_episode_s)
+        truncated = bool(not terminated and task.tick * task.dt + 1e-12 >= self.max_episode_s)
         self.done = terminated or truncated
         if truncated:
             task.adapter.stop()
@@ -162,14 +162,14 @@ class FeedingGymEnv(gym.Env):
         return obs, float(sum(terms.values())), terminated, truncated, info
 
     def get_state(self):
-        return copy.deepcopy(dict(schema_version=1, task=self.task.get_state(), steps=self.steps, done=self.done,
+        return copy.deepcopy(dict(schema_version=2, task=self.task.get_state(), steps=self.steps, done=self.done,
                                   max_episode_s=self.max_episode_s, last_observation=self.last_observation,
                                   step_metrics=self.step_metrics, rng_seed=self.np_random_seed,
                                   rng=self.np_random.bit_generator.state,
                                   action_rng=self.action_space.np_random.bit_generator.state))
 
     def set_state(self, state):
-        if state["schema_version"] != 1 or state["max_episode_s"] != self.max_episode_s:
+        if state["schema_version"] != 2 or state["max_episode_s"] != self.max_episode_s:
             raise ValueError("Incompatible environment snapshot")
         self.task.set_state(state["task"])
         self.steps, self.done = state["steps"], state["done"]

@@ -30,79 +30,95 @@ def rotation_error(a, b):
     return float(np.arccos(np.clip((np.trace(a.T @ b) - 1) / 2, -1., 1.)))
 
 
+def ellipsoid_bounds(model, data, geom, origin, rotation):
+    """Exact extrema in a frame, including the ellipsoid's current orientation."""
+    centre = (data.geom_xpos[geom] - origin) @ rotation
+    axes = data.geom_xmat[geom].reshape(3, 3).T @ rotation
+    radius = np.linalg.norm(model.geom_size[geom, :, None] * axes, axis=0)
+    return centre - radius, centre + radius
+
+
 def evidence(task):
-    """Read current geometry/contact truth; never change simulation state."""
+    """Current single-bean geometry/contact truth; no simulation state writes."""
     m, d, idx, cfg = task.model, task.data, task.index, task.task_config
-    site = lambda name: named_id(m, mujoco.mjtObj.mjOBJ_SITE, name)
-    geom = lambda name: named_id(m, mujoco.mjtObj.mjOBJ_GEOM, name)
-    mouth, receiver, plate = (site(n) for n in ("mouth_entry", "mouth_receiver", "plate_frame"))
-    mr = d.site_xmat[mouth].reshape(3, 3)
-    jr = d.site_xmat[receiver].reshape(3, 3)
-    tr = d.site_xmat[idx.tcp].reshape(3, 3)
-    tcp = d.site_xpos[idx.tcp]
-    food = d.xpos[idx.food_body]
-    food_corners = geom_corners(m, d, geom("food_box"))
-    fc = (food_corners - d.site_xpos[mouth]) @ mr
-    fj = (food_corners - d.site_xpos[receiver]) @ jr
-    rel = tr.T @ (food - tcp)
-    pairs = {frozenset((r["group1"], r["group2"])) for r in task.contacts
-             if r["force_n"] > cfg["contact_min_force_n"]}
+    mouth = named_id(m, mujoco.mjtObj.mjOBJ_SITE, "mouth_entry")
+    receiver = named_id(m, mujoco.mjtObj.mjOBJ_SITE, "mouth_receiver")
+    bean = int(idx.bean_collision_geoms[0])
+    mr, jr, tr = [d.site_xmat[g].reshape(3, 3) for g in (mouth, receiver, idx.tcp)]
+    tcp, food = d.site_xpos[idx.tcp], d.geom_xpos[bean]
+    # Tool geometry is rigid. Cache local vertices, never world-space head/jaw state.
+    if getattr(task, "_event_geometry_model", None) is not m:
+        task._event_geometry_model = m
+        tool_points = [(geom_corners(m, d, g) - tcp) @ tr for g in idx.spoon_geoms]
+        task._event_tool_starts = np.r_[0, np.cumsum([len(p) for p in tool_points])[:-1]]
+        task._event_tool_points = np.concatenate(tool_points)
+        task._event_scoop_points = np.concatenate([(geom_corners(m, d, g) - tcp) @ tr for g in idx.scoop_geoms])
+        bottom = named_id(m, mujoco.mjtObj.mjOBJ_GEOM, "collision_bowl_fast_bottom_disk")
+        task._event_rim = max(geom_corners(m, d, g)[:, 2].max() for g in idx.bowl_geoms if g != bottom)
+    scoop_local = task._event_scoop_points
+    rel = (food - tcp) @ tr
+    rows = [r for r in task.contacts if r["force_n"] > cfg["contact_min_force_n"]]
+    pairs = {frozenset((r["group1"], r["group2"])) for r in rows}
     contact = lambda a, b: frozenset((a, b)) in pairs
-    scoop = np.concatenate([geom_corners(m, d, g) for g in idx.scoop_geoms])
-    scoop_local = (scoop - tcp) @ tr
-    support_force = sum(float(np.dot(r["force_on_geom2_world"], tr[:, 2]))
-                        * (1 if r["group2"] == "food" else -1)
-                        for r in task.contacts
-                        if ((r["geom1"] in idx.scoop_geoms and r["group2"] == "food")
-                            or (r["geom2"] in idx.scoop_geoms and r["group1"] == "food")))
-    # A loaded side/handle or the empty corners of the rounded mesh AABB are
-    # not a carrying surface. Ray-test the actual 130 convex scoop meshes.
-    over_scoop = (np.all(rel[:2] >= scoop_local[:, :2].min(axis=0))
-                  and np.all(rel[:2] <= scoop_local[:, :2].max(axis=0)))
-    supported = (support_force > cfg["contact_min_force_n"] and over_scoop
-                 and any(mujoco.mj_rayMesh(m, d, g, food, -tr[:, 2]) >= 0
-                         for g in idx.scoop_geoms))
-    on_plate = contact("food", "plate")
-    plate_corners = (food_corners - d.site_xpos[plate]) @ d.site_xmat[plate].reshape(3, 3)
-    plate_height = float(plate_corners[:, 2].min())
-    off_plate = not on_plate and plate_height > cfg["plate_clearance_m"]
+    loads = [r["force_on_geom2_world"] * (1 if r["geom2"] == bean else -1)
+             for r in rows if (r["geom2"] == bean and r["geom1"] in idx.scoop_geoms)
+             or (r["geom1"] == bean and r["geom2"] in idx.scoop_geoms)]
+    load = np.sum(loads, axis=0) if loads else np.zeros(3)
+    support_force = float(load @ tr[:, 2])
+    supported = (load[2] > task.bean_acceptance["support_min_force_n"]
+                 and support_force > cfg["contact_min_force_n"]
+                 and np.all(rel[:2] >= scoop_local[:, :2].min(0))
+                 and np.all(rel[:2] <= scoop_local[:, :2].max(0))
+                 and any(mujoco.mj_rayMesh(m, d, g, food, -tr[:, 2]) >= 0 for g in idx.scoop_geoms))
+    world_min, world_max = ellipsoid_bounds(m, d, bean, np.zeros(3), np.eye(3))
+    on_bowl = contact("food", "bowl")
+    off_bowl = not on_bowl and world_min[2] > task._event_rim
+    fc_min, fc_max = ellipsoid_bounds(m, d, bean, d.site_xpos[mouth], mr)
+    fj_min, _ = ellipsoid_bounds(m, d, bean, d.site_xpos[receiver], jr)
     tolerance = cfg["receiver_xy_tolerance_m"]
-    in_receiver = (np.all(fc[:, :2] >= np.asarray(cfg["receiver_min_xy_m"]) - tolerance)
-                   and np.all(fc[:, :2] <= np.asarray(cfg["receiver_max_xy_m"]) + tolerance)
-                   and fc[:, 2].max() <= cfg["receiver_top_m"]
-                   and fj[:, 2].min() >= -cfg["receiver_floor_tolerance_m"])
+    in_receiver = (np.all(fc_min[:2] >= np.asarray(cfg["receiver_min_xy_m"]) - tolerance)
+                   and np.all(fc_max[:2] <= np.asarray(cfg["receiver_max_xy_m"]) + tolerance)
+                   and fc_max[2] <= cfg["receiver_top_m"]
+                   and fj_min[2] >= -cfg["receiver_floor_tolerance_m"])
     mouth_supported = bool(in_receiver and contact("food", "mouth"))
-    inside = False
-    for g in idx.spoon_geoms:
-        corners = (geom_corners(m, d, g) - d.site_xpos[mouth]) @ mr
-        inside |= bool(np.all(corners.max(axis=0) >= cfg["interaction_min_m"])
-                       and np.all(corners.min(axis=0) <= cfg["interaction_max_m"]))
-    # Current jaw plane at the entry and back of the receiver, in mouth coordinates.
-    floor = geom_corners(m, d, geom("jaw_floor"))
-    upper = geom_corners(m, d, geom("mouth_upper"))
+    tool = task._event_tool_points @ (tr.T @ mr) + (tcp-d.site_xpos[mouth]) @ mr
+    tool_min = np.minimum.reduceat(tool, task._event_tool_starts, axis=0)
+    tool_max = np.maximum.reduceat(tool, task._event_tool_starts, axis=0)
+    inside = bool(np.any(np.all(tool_max >= cfg["interaction_min_m"], axis=1)
+                         & np.all(tool_min <= cfg["interaction_max_m"], axis=1)))
+    floor = geom_corners(m, d, named_id(m, mujoco.mjtObj.mjOBJ_GEOM, "jaw_floor"))
+    upper = geom_corners(m, d, named_id(m, mujoco.mjtObj.mjOBJ_GEOM, "mouth_upper"))
     aperture = float(((upper - d.site_xpos[mouth]) @ mr)[:, 2].min()
                      - ((floor - d.site_xpos[mouth]) @ mr)[:, 2].max())
-    width = cfg["receiver_max_xy_m"][1] - cfg["receiver_min_xy_m"][1]
-    carried = np.concatenate([scoop, food_corners])
-    # Height required by the present spoon/food arrangement, not a future jaw target.
-    projected = carried @ mr
-    required_height = float(np.ptp(projected[:, 2])) + cfg["clearance_margin_m"]
-    required_width = float(np.ptp(projected[:, 1])) + cfg["clearance_margin_m"]
+    projected = (scoop_local @ tr.T + tcp - d.site_xpos[mouth]) @ mr
+    required = np.maximum(projected.max(0), fc_max) - np.minimum(projected.min(0), fc_min)
+    required_height = float(required[2]) + cfg["clearance_margin_m"]
+    required_width = float(required[1]) + cfg["clearance_margin_m"]
     wait = d.site_xpos[mouth] - mr[:, 0] * cfg["wait_offset_m"]
     aligned = rotation_error(tr, mr) <= cfg["orientation_tolerance_rad"]
     at_wait = np.linalg.norm(tcp - wait) <= cfg["position_tolerance_m"] and aligned
-    return dict(supported=bool(supported), off_plate=bool(off_plate), on_plate=on_plate,
-                plate_height_m=plate_height, spoon_support_force_n=support_force,
+    velocity = np.zeros(6)
+    mujoco.mj_objectVelocity(m, d, mujoco.mjtObj.mjOBJ_BODY, int(idx.bean_bodies[0]), velocity, 0)
+    low_speed = (np.linalg.norm(velocity[3:]) < task.bean_acceptance["linear_speed_m_s"]
+                 and np.linalg.norm(velocity[:3]) < task.bean_acceptance["angular_speed_rad_s"])
+    bean_penetration = any((r.get("bean1_id") or r.get("bean2_id"))
+                           and r["distance"] < -task.bean_acceptance["penetration_limit_m"]
+                           for r in task.contacts + task.applied_contacts)
+    return dict(supported=bool(supported), off_bowl=bool(off_bowl), on_bowl=on_bowl,
+                bowl_clearance_m=float(world_min[2] - task._event_rim),
+                pickup_eligible=bool(supported and off_bowl and low_speed),
+                spoon_support_force_n=support_force, bean_penetration=bean_penetration,
                 required_height_m=required_height, required_width_m=required_width,
                 mouth_supported=mouth_supported, released=not contact("food", "spoon"),
                 tool_inside=inside, tool_mouth_contact=contact("spoon", "mouth"),
                 at_wait=bool(at_wait), aligned=bool(aligned), aperture_m=aperture,
-                ready=bool(aperture >= required_height and width >= required_width and aligned),
+                ready=bool(aperture >= required_height and
+                           cfg["receiver_max_xy_m"][1] - cfg["receiver_min_xy_m"][1] >= required_width and aligned),
                 food_ground_contact=contact("food", "table") or contact("food", "floor"),
-                food_valid=bool(np.linalg.norm(food - d.site_xpos[plate]) < 1.),
+                food_valid=bool(np.linalg.norm(food - task.scene_config["bowl_frame_position_m"]) < 1.),
                 penetration=any(r["distance"] < -cfg["penetration_limit_m"] for r in task.contacts),
                 mouth_position=d.site_xpos[mouth].copy(), mouth_rotation=mr.copy(),
-                wait_position=wait, food_position=food.copy(), tcp_position=tcp.copy())
+                wait_position=wait, bean_position=food.copy(), tcp_position=tcp.copy())
 
 
 class TaskEvents:
@@ -114,7 +130,7 @@ class TaskEvents:
         self.awarded = set()
         self.acquired = False
         self.delivered = False
-        self.left_plate = False
+        self.left_bowl = False
         self.success = False
         self.failure_reason = None
 
@@ -133,15 +149,15 @@ class TaskEvents:
 
     def update(self, e, dt, time, failure=None, penetration=False):
         c = self.config
-        pickup = self.duration("pickup", e["supported"] and e["off_plate"], dt, c["support_confirm_s"])
+        pickup = self.duration("pickup", e["supported"] and e["off_bowl"] and e["pickup_eligible"], dt, c["support_confirm_s"])
         delivery = self.duration("delivery", self.acquired and e["mouth_supported"] and e["released"],
                                  dt, c["delivery_confirm_s"])
         retract = self.duration("retract", self.delivered and e["mouth_supported"] and e["released"]
                                 and not e["tool_inside"] and not e["tool_mouth_contact"],
                                 dt, c["retract_confirm_s"])
-        self.left_plate |= e["off_plate"]
-        unsupported = self.duration("unsupported", (self.acquired or self.left_plate)
-                                    and not e["supported"] and not e["mouth_supported"] and not e["on_plate"],
+        self.left_bowl |= e["off_bowl"]
+        unsupported = self.duration("unsupported", (self.acquired or self.left_bowl)
+                                    and not e["supported"] and not e["mouth_supported"] and not e["on_bowl"],
                                     dt, c["unsupported_grace_s"])
         deep = self.duration("penetration", penetration or e["penetration"], dt, c["penetration_confirm_s"])
         ready = self.duration("ready", self.phase == "WAIT_READY" and e["ready"] and e["at_wait"],
@@ -149,11 +165,11 @@ class TaskEvents:
         reasons = []
         if failure:
             reasons.append(failure)
-        if deep:
+        if deep or e["bean_penetration"]:
             reasons.append("model_penetration")
-        if self.delivered and (unsupported or e["supported"] or e["on_plate"] or e["food_ground_contact"]):
+        if self.delivered and (unsupported or e["supported"] or e["on_bowl"] or e["food_ground_contact"]):
             reasons.append("food_lost_after_delivery")
-        elif e["food_ground_contact"] or unsupported or (self.acquired and e["on_plate"]):
+        elif e["food_ground_contact"] or unsupported or (self.acquired and e["on_bowl"]):
             reasons.append("food_dropped")
         if self.phase == "TRANSFER" and not self.delivered and not e["tool_inside"] and not e["released"]:
             reasons.append("withdrawal_before_release")
@@ -197,6 +213,6 @@ class TaskEvents:
             self.switch("WAIT_READY", time)
 
     def distance(self, e):
-        target = {"ACQUIRE": "food_position", "TRANSPORT": "wait_position", "RECOVER": "wait_position",
+        target = {"ACQUIRE": "bean_position", "TRANSPORT": "wait_position", "RECOVER": "wait_position",
                   "APPROACH": "mouth_position", "RETRACT": "wait_position"}.get(self.phase)
         return None if target is None else float(np.linalg.norm(e["tcp_position"] - e[target]))

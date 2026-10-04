@@ -49,7 +49,7 @@ def test_timing_action_and_seed_replay(env):
 
 
 def test_complete_snapshot_replay_and_independence(env):
-    env.reset(seed=21, options={"preset": "food_on_spoon"})
+    env.reset(seed=21, options={"preset": "beans_on_spoon"})
     for _ in range(7):
         env.step(np.array([.05, 0, 0, 0, 0, 0]))
     state = env.get_state()
@@ -147,9 +147,9 @@ def test_invalid_action_stops_and_requires_reset(action):
 
 
 def test_pickup_reward_once_and_no_phase_progress_jump(env):
-    env.reset(seed=0, options={"preset": "food_on_spoon"})
+    env.reset(seed=0, options={"preset": "beans_on_spoon"})
     awarded = []
-    for _ in range(15):
+    for _ in range(80):
         _, _, terminated, _, info = env.step(np.zeros(6))
         assert not terminated, info
         if info["reward_terms"]["pickup"]:
@@ -159,7 +159,7 @@ def test_pickup_reward_once_and_no_phase_progress_jump(env):
 
 
 def test_wait_ready_has_no_approach_reward(env):
-    env.reset(seed=0, options={"preset": "food_on_spoon"})
+    env.reset(seed=0, options={"preset": "beans_on_spoon"})
     env.task.logic.phase = "WAIT_READY"  # Synthetic reward isolation, not a physical success claim.
     _, _, _, _, info = env.step(np.array([.1, 0, 0, 0, 0, 0]))
     assert info["reward_terms"]["progress"] == 0

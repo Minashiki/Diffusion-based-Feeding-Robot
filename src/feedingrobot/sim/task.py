@@ -21,8 +21,6 @@ from feedingrobot.sim.beans import bean_state, bean_diagnostics, place_beans, sp
 
 class FeedingTask:
     def __init__(self, robot_id="panda", timestep=None, *, task_mode=False):
-        if task_mode:
-            raise NotImplementedError("M3/M4 require the pending single-bean full feeding task migration")
         started = time.perf_counter()
         self.model, self.index, self.robot_config, self.scene_config = load_model(robot_id, timestep)
         self.model_load_wall_s = time.perf_counter() - started
@@ -49,11 +47,14 @@ class FeedingTask:
             raise ValueError(f"Unknown reset preset: {preset}")
         from feedingrobot.sim.scenarios import validate_scenario
         scenario = validate_scenario(scenario)
-        if set(scenario) & {"food_mass_kg", "food_friction", "food_offset_m", "recover"}:
+        if (set(scenario) & {"food_mass_kg", "food_friction", "food_offset_m"}
+                or ("recover" in scenario and not self.task_mode)):
             raise ValueError("Single-food scenario parameters are not supported by native Beans")
         self.seed = int(seed)
         self.model.jnt_range[self.index.head_joints[-1]] = self.default_jaw_range
         self.model.body_pos[self.head_body] = scenario.get("head_origin_m", self.default_head_origin)
+        if scenario.get("recover", False):
+            self.model.jnt_range[self.index.head_joints[-1], 0] = -.65
         mujoco.mj_setConst(self.model, self.data)
         mujoco.mj_resetData(self.model, self.data)
         self.tick = 0
@@ -106,6 +107,8 @@ class FeedingTask:
             self.adapter.reset()
             if self.terminated:
                 self.adapter.stop(self.failure_reason, fault=True)
+        if self.task_mode:
+            self.logic = TaskEvents(self.task_config)
         return self.snapshot()
 
     def _settle_beans(self, preset):
@@ -180,7 +183,7 @@ class FeedingTask:
         mujoco.mj_saveModel(self.model, None, buffer)
         digest = hashlib.sha256(buffer.tobytes())
         digest.update(json.dumps([self.robot_config, self.scene_config, self.task_config, self.bean_acceptance], sort_keys=True).encode())
-        return dict(schema_version=3, event_rules_version=2, robot_id=self.robot_id, task_mode=self.task_mode,
+        return dict(schema_version=4 if self.task_mode else 3, event_rules_version=3 if self.task_mode else 2, robot_id=self.robot_id, task_mode=self.task_mode,
                     model_config_hash=digest.hexdigest(), mujoco_version=mujoco.__version__)
 
     def get_state(self):
@@ -274,7 +277,7 @@ class FeedingTask:
     def _terminate(self, reason):
         self.terminated = True
         self.failure_reason = reason
-        if self.task_mode and reason == "nonfinite_state" and self.logic.failure_reason is None:
+        if self.task_mode and self.logic and reason == "nonfinite_state" and self.logic.failure_reason is None:
             self.logic.failure_reason = reason
             self.logic.emit("failure", self.data.time, reason=reason)
         if self.adapter:
