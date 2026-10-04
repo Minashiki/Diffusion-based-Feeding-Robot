@@ -8,7 +8,9 @@ from feedingrobot.sim.task import FeedingTask
 
 @pytest.fixture(params=["panda", "ur5e"])
 def task(request):
-    return FeedingTask(request.param)
+    task = FeedingTask(request.param)
+    task.reset(preset="empty")
+    return task
 
 
 def test_import_is_this_project():
@@ -27,7 +29,7 @@ def test_model_contract(task):
     assert abs(index.tool_mass - .035) < 1e-9
     assert model.body_mass[index.tool_body] == 0
     assert len(index.spoon_geoms) == 145 and len(index.scoop_geoms) == 130
-    assert len(index.handle_geoms) == 15 and len(index.plate_geoms) == 17
+    assert len(index.handle_geoms) == 15 and len(index.bowl_geoms) == 17
     assert model.npair == 145
 
 
@@ -74,7 +76,7 @@ def test_solver_failure_cancels_old_command(task, monkeypatch):
     assert task.adapter.command is None
     with pytest.raises(RuntimeError):
         task.adapter.set_twist(np.zeros(6), task.data.time, task.data.time + 1)
-    task.reset()
+    task.reset(preset="empty")
     assert task.adapter.fault is None
 
 
@@ -82,13 +84,13 @@ def test_invalid_command_and_nonfinite_state(task):
     with pytest.raises(ValueError):
         task.adapter.set_twist([np.nan] * 6, 0, 1)
     assert task.adapter.command is None
-    task.reset()
+    task.reset(preset="empty")
     task.data.qvel[task.index.dofs[0]] = np.inf
     result = task.step_physics()
     assert result["terminated"] and result["failure_reason"] == "nonfinite_state"
     with pytest.raises(RuntimeError):
         task.step_physics()
-    task.reset()
+    task.reset(preset="empty")
     assert np.isfinite(task.snapshot()["dq"]).all()
 
 

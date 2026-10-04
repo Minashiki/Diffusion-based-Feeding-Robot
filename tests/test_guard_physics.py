@@ -62,6 +62,7 @@ def test_physical_obstruction_release_cannot_resume(robot, tmp_path, monkeypatch
 def test_nonfinite_solver_output(robot, monkeypatch):
     import mink
     task = FeedingTask(robot)
+    task.reset(preset="empty")
     monkeypatch.setattr(mink, "solve_ik", lambda *args, **kwargs: np.full(task.model.nv, np.nan))
     task.adapter.set_twist([.01, 0, 0, 0, 0, 0], 0, 1)
     task.step_physics()

@@ -1,4 +1,24 @@
+# 单豆喂餐原型验收
+
+当前模型为 `single_bean_native_v1`，只编译 bean_000，固定布局自然沉降，Panda／UR5e 顺序执行。正式必需矩阵、原门槛和冻结流程见 [单豆 M1 方案](m1_beans_rebuild_plan.md)。单豆版双机器人完整候选 M1 已通过，最终冻结以匹配当前输入的报告和清单确认；M3/M4 not_verified，旧模型成绩不迁移。
+
+当前报告使用 `outputs/single_bean/v1/m1/`，最终放行凭双机器人完整报告及同目录 `freeze_manifest.json`；历史失败输出保持。seeds 0–9 与 0–2 只验证固定布局重复性。双豆接触不属于正式验收，独立回归保留。
+## 单豆 M1 完整候选结果
+
+双机器人各 20/20 必需项通过，M1-A/B/C/D 均 passed，viewer 开启／同步／关闭通过。相关回归 137 项通过；两机器人各 100 次 reset 最大状态差为 0；三组共同初态共 60 个沉降用例通过。三组设置、seeds 0/1/2 共 18 次真实舀取均通过。M3/M4 保持 not_verified。
+
+| 机器人 | 首次接触高度／竖向半径 | 首次向上力（mN） | 推进上升（mm） | 数值 TCP 最大差（mm） | 沉降最大穿透（mm） |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| panda | -0.612120 | 0.460860 | 0.571599 | 1.092568 | 0.118141 |
+| ur5e | -0.651882 | 0.479157 | 0.568816 | 0.997093 | 0.118141 |
+
+完整候选报告位于 `outputs/single_bean/v1/m1/candidate/<robot>/m1d/`，输入前后及跨机器人一致。最终 frozen 输入报告位于 `outputs/single_bean/v1/m1/<robot>/m1d/`；统一 [冻结清单](../outputs/single_bean/v1/m1/freeze_manifest.json) 是最终发布依据，需全部必需项通过且输入、报告和证据 SHA256 一致。本文的数值表来自已经通过的完整候选；最终复验成绩读取输出报告，避免验收后改写被哈希的输入文档。
+
+## 历史记录（下文仅适用于原版本）
+
 # 新餐具 M1 / M3 正式验收：v2
+
+本文仅记录历史 `new_tableware_v2` 盘子／单块食物成绩，不适用于当前 `beans_native_v1`。当前入口已迁移为原生 Beans 完整 M1-D，证据见 `outputs/beans_native/v1/m1/<robot>/m1d/`；M3/M4 保持未验证。
 
 2026-10-01 在现有 `feedingrobot` conda 环境完成双机器人新餐具重建与正式放行。M1、M3 所有必需项目通过；M4 教师、示范采集和 DP/SAC 策略训练仍未放行。
 
@@ -61,3 +81,5 @@ conda run -n feedingrobot python -m feedingrobot.scripts.validate_m3 --robot ur5
 下一阶段按 [主方案](../SimModelPlann.md) 第 12 节重建 M4，先验证真实取餐，再验证承载运输、入口交付与撤离，冻结后执行独立教师门槛。本轮未生成正式示范集或训练策略。
 
 M4 当前重建进展及取餐停步证据见 [M4 重建状态](m4_rebuild_status.md)。M1/M3 v2 放行结论保持；该记录不构成 M4 放行。
+
+M1-D 第一轮候选完整入口已实际顺序执行双机器人，退出码 1；A/B/C、viewer、性能及来源清单通过，两个机器人输入哈希前后相同。半步长及高精度取豆峰值对照超限，未冻结；证据保存在 `outputs/beans_native/v1/m1/m1d_candidate_display/<robot>/m1d/`。阶段切换计时已修正为全回合共同 20 ms 命令网格，10 ms 采样不变；共同命令时钟完整复验已结束，命令返回 1；正式报告位于 `outputs/beans_native/v1/m1/<robot>/m1d/`。两机器人 A/B/C、viewer、性能及来源清单通过，初态回放核验通过，运行前后及双机器人输入 SHA256 一致；M1-D 数值对照失败，参数保留 candidate，未生成 freeze_manifest.json。原修订 2 接触参数（solref 2 ms）及轨迹目标保持不变；2.5 ms 隔离试验不能通过 Panda seed 1 的 5 s 沉降门槛，不采用。掉落仍按首次确认即结束，终态按各自结束状态比较，时间差只记录。

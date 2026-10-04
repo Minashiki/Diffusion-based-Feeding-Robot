@@ -1,80 +1,2920 @@
 {
-  "schema_version": 2,
-  "model_version": "new_tableware_v2",
+  "schema_version": 3,
+  "model_version": "single_bean_native_v1",
+  "scope": "Single-bean feeding prototype; fixed spawn pose and natural settling; no randomized-layout coverage",
   "status": "passed",
-  "scope": "M1 and directed P0 M3 acceptance; not full feeding teacher acceptance",
+  "parameter_status": "frozen",
   "milestones": {
     "M1": "passed",
-    "M3": "passed",
+    "M1-A": "passed",
+    "M1-B": "passed",
+    "M1-C": "passed",
+    "M1-D": "passed",
+    "M3": "not_verified",
     "M4": "not_verified"
   },
-  "pytest": {
-    "tests": 246,
-    "failures": 0,
-    "errors": 0,
-    "warnings": 4,
-    "log": "outputs/new_tableware/v2/pytest.log",
-    "junit": "outputs/new_tableware/v2/pytest.xml"
+  "reports": {
+    "panda": "outputs/single_bean/v1/m1/panda/m1d/m1d_report.json",
+    "ur5e": "outputs/single_bean/v1/m1/ur5e/m1d/m1d_report.json"
   },
+  "freeze_manifest": "outputs/single_bean/v1/m1/freeze_manifest.json",
+  "historical": {
+    "beans_native_v1": {
+      "schema_version": 3,
+      "model_version": "beans_native_v1",
+      "status": "failed",
+      "milestones": {
+        "M1": "failed",
+        "M1-A": "passed",
+        "M1-B": "passed",
+        "M1-C": "passed",
+        "M1-D": "failed",
+        "M3": "not_verified",
+        "M4": "not_verified"
+      },
+      "historical": {
+        "new_tableware_v2": {
+          "schema_version": 2,
+          "model_version": "new_tableware_v2",
+          "status": "passed",
+          "scope": "M1 and directed P0 M3 acceptance; not full feeding teacher acceptance",
+          "milestones": {
+            "M1": "passed",
+            "M3": "passed",
+            "M4": "not_verified"
+          },
+          "pytest": {
+            "tests": 246,
+            "failures": 0,
+            "errors": 0,
+            "warnings": 4,
+            "log": "outputs/new_tableware/v2/pytest.log",
+            "junit": "outputs/new_tableware/v2/pytest.xml"
+          },
+          "robots": {
+            "panda": {
+              "status": "passed",
+              "m1": {
+                "report": "outputs/new_tableware/v2/m1/panda/report.json",
+                "passed_cases": 15
+              },
+              "m3": {
+                "report": "outputs/new_tableware/v2/m3/panda/report.json",
+                "passed_cases": 26,
+                "physical_cases": 21,
+                "seeds": [
+                  0,
+                  1,
+                  2
+                ],
+                "baseline_runs": 63,
+                "comparisons": 126,
+                "maximum_convergence_errors": {
+                  "event_time_s": 0.0020000000000000018,
+                  "tcp_position_m": 3.561703103428603e-05,
+                  "tcp_path_m": 4.136631443571596e-05,
+                  "event_tcp_position_m": 3.561703103428603e-05
+                },
+                "snapshot_max_observation_error": 0.0,
+                "viewer": "passed"
+              }
+            },
+            "ur5e": {
+              "status": "passed",
+              "m1": {
+                "report": "outputs/new_tableware/v2/m1/ur5e/report.json",
+                "passed_cases": 15
+              },
+              "m3": {
+                "report": "outputs/new_tableware/v2/m3/ur5e/report.json",
+                "passed_cases": 26,
+                "physical_cases": 21,
+                "seeds": [
+                  0,
+                  1,
+                  2
+                ],
+                "baseline_runs": 63,
+                "comparisons": 126,
+                "maximum_convergence_errors": {
+                  "event_time_s": 0.0015000000000000013,
+                  "tcp_position_m": 3.588807599205031e-05,
+                  "tcp_path_m": 4.151780056623026e-05,
+                  "event_tcp_position_m": 3.7422716642567746e-05
+                },
+                "snapshot_max_observation_error": 0.0,
+                "viewer": "passed"
+              }
+            }
+          },
+          "preserved_evidence": [
+            "outputs/m0",
+            "outputs/new_tableware/v1/m1/panda",
+            "outputs/new_tableware/v1/m1/ur5e"
+          ]
+        }
+      },
+      "candidate_runs": {
+        "phase_relative_clock": {
+          "status": "failed",
+          "reports": {
+            "panda": "outputs/beans_native/v1/m1/m1d_candidate_display/panda/m1d/m1d_report.json",
+            "ur5e": "outputs/beans_native/v1/m1/m1d_candidate_display/ur5e/m1d/m1d_report.json"
+          },
+          "input_hashes_unchanged": true
+        },
+        "episode_clock": {
+          "status": "failed",
+          "reports": {
+            "panda": "outputs/beans_native/v1/m1/panda/m1d/m1d_report.json",
+            "ur5e": "outputs/beans_native/v1/m1/ur5e/m1d/m1d_report.json"
+          },
+          "input_hashes_unchanged": true,
+          "failures": {
+            "panda": {
+              "dt05ms": [
+                "tilt",
+                "acceleration",
+                "reachability",
+                "sweep_seed_0",
+                "sweep_seed_1",
+                "sweep_seed_2"
+              ],
+              "iterations200": [
+                "sweep_seed_0",
+                "sweep_seed_1",
+                "sweep_seed_2"
+              ]
+            },
+            "ur5e": {
+              "dt05ms": [
+                "sweep_seed_0",
+                "sweep_seed_1"
+              ],
+              "iterations200": [
+                "sweep_seed_0",
+                "sweep_seed_1",
+                "sweep_seed_2"
+              ]
+            }
+          }
+        }
+      },
+      "parameter_status": "candidate",
+      "scope": "Native Beans M1 numerical acceptance failed; no freeze or M3/M4 release",
+      "pytest": {
+        "tests": 126,
+        "failures": 0,
+        "log": "outputs/beans_native/v1/m1/m1d_regression.log"
+      },
+      "robots": {
+        "panda": {
+          "status": "failed",
+          "report": "outputs/beans_native/v1/m1/panda/m1d/m1d_report.json",
+          "stages": {
+            "M1-A": "passed",
+            "M1-B": "passed",
+            "M1-C": "passed",
+            "M1-D": "failed",
+            "M3": "not_verified",
+            "M4": "not_verified"
+          },
+          "reset_max_difference": 0.0,
+          "numerical_failures": {
+            "dt05ms": [
+              "tilt",
+              "acceleration",
+              "reachability",
+              "sweep_seed_0",
+              "sweep_seed_1",
+              "sweep_seed_2"
+            ],
+            "iterations200": [
+              "sweep_seed_0",
+              "sweep_seed_1",
+              "sweep_seed_2"
+            ]
+          }
+        },
+        "ur5e": {
+          "status": "failed",
+          "report": "outputs/beans_native/v1/m1/ur5e/m1d/m1d_report.json",
+          "stages": {
+            "M1-A": "passed",
+            "M1-B": "passed",
+            "M1-C": "passed",
+            "M1-D": "failed",
+            "M3": "not_verified",
+            "M4": "not_verified"
+          },
+          "reset_max_difference": 0.0,
+          "numerical_failures": {
+            "dt05ms": [
+              "sweep_seed_0",
+              "sweep_seed_1"
+            ],
+            "iterations200": [
+              "sweep_seed_0",
+              "sweep_seed_1",
+              "sweep_seed_2"
+            ]
+          }
+        }
+      },
+      "current_candidate": {
+        "contact_parameter_revision": 4,
+        "parameter_status": "candidate",
+        "m1_status": "incomplete",
+        "scope": "Root milestones and metrics retain historical reports; this object describes the current contact correction candidate",
+        "milestones": {
+          "M1-A": "passed",
+          "M1-B": "passed",
+          "M1-C": "not_verified",
+          "M1-D": "not_verified",
+          "M3": "not_verified",
+          "M4": "not_verified"
+        },
+        "single_bean_convergence": "passed",
+        "local_15_bean_motion": "failed",
+        "related_tests_passed": 129,
+        "m1b_report": "outputs/beans_native/v1/m1/contact_fix_candidate_v4/m1b_regression.json",
+        "contact_report": "docs/m1d_single_bean_contact_fix.md",
+        "freeze_manifest": null
+      }
+    }
+  },
+  "verification_basis": "Completed dual-robot full candidate M1; formal freeze requires current-input-matching final reports and manifest",
   "robots": {
     "panda": {
       "status": "passed",
-      "m1": {
-        "report": "outputs/new_tableware/v2/m1/panda/report.json",
-        "passed_cases": 15
+      "passed_cases": 20,
+      "stages": {
+        "M1-A": "passed",
+        "M1-B": "passed",
+        "M1-C": "passed",
+        "M1-D": "passed",
+        "M3": "not_verified",
+        "M4": "not_verified"
       },
-      "m3": {
-        "report": "outputs/new_tableware/v2/m3/panda/report.json",
-        "passed_cases": 26,
-        "physical_cases": 21,
-        "seeds": [
-          0,
-          1,
-          2
-        ],
-        "baseline_runs": 63,
-        "comparisons": 126,
-        "maximum_convergence_errors": {
-          "event_time_s": 0.0020000000000000018,
-          "tcp_position_m": 3.561703103428603e-05,
-          "tcp_path_m": 4.136631443571596e-05,
-          "event_tcp_position_m": 3.561703103428603e-05
+      "candidate_report": "outputs/single_bean/v1/m1/candidate/panda/m1d/m1d_report.json",
+      "report": "outputs/single_bean/v1/m1/panda/m1d/m1d_report.json",
+      "reset_max_difference": 0.0,
+      "settle_cases": 30,
+      "max_settle_penetration_m": 0.00011814111163624812,
+      "max_numerical_tcp_error_m": 0.0010925680470521403,
+      "pickup": {
+        "seed_0": {
+          "seed": 0,
+          "reset_preset": "beans_in_bowl",
+          "picked_ids": [
+            "bean_000"
+          ],
+          "support_windows_s": [
+            9.733000000000045
+          ],
+          "first_entry_contact": {
+            "time_s": 11.847999999998873,
+            "phase": "sweep",
+            "bean_id": "bean_000",
+            "spoon_geom": "collision_spoon_scoop_coarse_prism_117",
+            "position_world_m": [
+              0.46219337116636255,
+              -0.16536991463744938,
+              -0.013998714521601537
+            ],
+            "position_tcp_m": [
+              0.019729025605670043,
+              0.0026289402566452218,
+              0.007466024873156175
+            ],
+            "height_relative_radius": -0.6121204799717316,
+            "force_on_bean_world_n": [
+              0.0006430468876082551,
+              -2.4852747314467025e-05,
+              0.00046086006869020354
+            ]
+          },
+          "phase_motion": {
+            "entry": {
+              "start_position_m": [
+                0.46713283373127734,
+                -0.16431011840479315,
+                -0.011549506463682743
+              ],
+              "displacement_m": [
+                -2.7244023694472652e-05,
+                3.763035006101867e-05,
+                -4.3173848473035403e-07
+              ]
+            },
+            "sweep": {
+              "start_position_m": [
+                0.46710558970758287,
+                -0.16427248805473213,
+                -0.011549938202167473
+              ],
+              "displacement_m": [
+                0.008569605753227738,
+                -0.003815641003239889,
+                0.0005715989536685274
+              ]
+            }
+          },
+          "observation_duration_s": 10.0,
+          "achieved": [
+            {
+              "phase": "above",
+              "position_error_m": 0.0002660616654677045,
+              "orientation_error_rad": 0.009922772680275204
+            },
+            {
+              "phase": "pre_entry",
+              "position_error_m": 0.0006981492301337431,
+              "orientation_error_rad": 4.219168133681528e-05
+            },
+            {
+              "phase": "entry",
+              "position_error_m": 0.0006994858617561336,
+              "orientation_error_rad": 1.6487781699363503e-05
+            },
+            {
+              "phase": "sweep",
+              "position_error_m": 0.000699495532306876,
+              "orientation_error_rad": 4.06971883039215e-05
+            },
+            {
+              "phase": "wall_align",
+              "position_error_m": 0.0006139886255442768,
+              "orientation_error_rad": 0.00996134150042634
+            },
+            {
+              "phase": "wall_45",
+              "position_error_m": 0.0005375621561726645,
+              "orientation_error_rad": 0.009976682187610102
+            },
+            {
+              "phase": "wall_30",
+              "position_error_m": 0.0004403871699933004,
+              "orientation_error_rad": 0.00997399225872936
+            },
+            {
+              "phase": "wall_15",
+              "position_error_m": 0.0006998088409022574,
+              "orientation_error_rad": 0.006471236472555623
+            },
+            {
+              "phase": "wall_level",
+              "position_error_m": 0.0006983210162309778,
+              "orientation_error_rad": 0.007248073059007999
+            },
+            {
+              "phase": "clearance",
+              "position_error_m": 0.0006966931415031155,
+              "orientation_error_rad": 0.00010808890590403455
+            },
+            {
+              "phase": "wall_seat_tip",
+              "position_error_m": 8.433474550682958e-05,
+              "orientation_error_rad": 0.009996294033689627
+            },
+            {
+              "phase": "wall_seat_level",
+              "position_error_m": 9.504114588553106e-05,
+              "orientation_error_rad": 0.009976151999751208
+            }
+          ],
+          "path": [
+            {
+              "phase": "above",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.12440000000000001
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "pre_entry",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.02546193652041082
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "entry",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.00046193652041082167
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "sweep",
+              "position": [
+                0.45883065415601115,
+                -0.16799999999999998,
+                0.00046193652041082167
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_align",
+              "position": [
+                0.4669348798204054,
+                -0.174,
+                0.00710846680558248
+              ],
+              "rotation": [
+                [
+                  0.49240387650610423,
+                  0.17364817766693036,
+                  0.8528685319524433
+                ],
+                [
+                  -0.08682408883346521,
+                  0.9848077530122082,
+                  -0.1503837331804353
+                ],
+                [
+                  -0.8660254037844387,
+                  -1.3877787807814457e-17,
+                  0.5000000000000002
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_45",
+              "position": [
+                0.47342885707486826,
+                -0.174,
+                0.02194448068365414
+              ],
+              "rotation": [
+                [
+                  0.696364240320019,
+                  0.17364817766693033,
+                  0.696364240320019
+                ],
+                [
+                  -0.12278780396897285,
+                  0.9848077530122081,
+                  -0.12278780396897285
+                ],
+                [
+                  -0.7071067811865475,
+                  6.938893903907228e-18,
+                  0.7071067811865475
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_30",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.03363005397613486
+              ],
+              "rotation": [
+                [
+                  0.8528685319524433,
+                  0.17364817766693036,
+                  0.49240387650610407
+                ],
+                [
+                  -0.1503837331804353,
+                  0.9848077530122082,
+                  -0.08682408883346517
+                ],
+                [
+                  -0.5,
+                  0.0,
+                  0.8660254037844387
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_15",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.06302735608063671
+              ],
+              "rotation": [
+                [
+                  0.9512512425641977,
+                  0.17364817766693033,
+                  0.25488700224417876
+                ],
+                [
+                  -0.1677312594965206,
+                  0.9848077530122079,
+                  -0.04494345552754777
+                ],
+                [
+                  -0.2588190451025207,
+                  0.0,
+                  0.9659258262890682
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_level",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.08751820159984185
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "clearance",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "wall_seat_tip",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9810602621904069,
+                  0.17364817766693033,
+                  -0.0858316511774313
+                ],
+                [
+                  -0.17298739392508947,
+                  0.984807753012208,
+                  0.015134435901338623
+                ],
+                [
+                  0.08715574274765817,
+                  8.673617379884035e-19,
+                  0.9961946980917454
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_seat_level",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.005
+            }
+          ]
         },
-        "snapshot_max_observation_error": 0.0,
-        "viewer": "passed"
+        "seed_1": {
+          "seed": 1,
+          "reset_preset": "beans_in_bowl",
+          "picked_ids": [
+            "bean_000"
+          ],
+          "support_windows_s": [
+            9.733000000000045
+          ],
+          "first_entry_contact": {
+            "time_s": 11.847999999998873,
+            "phase": "sweep",
+            "bean_id": "bean_000",
+            "spoon_geom": "collision_spoon_scoop_coarse_prism_117",
+            "position_world_m": [
+              0.46219337116636255,
+              -0.16536991463744938,
+              -0.013998714521601537
+            ],
+            "position_tcp_m": [
+              0.019729025605670043,
+              0.0026289402566452218,
+              0.007466024873156175
+            ],
+            "height_relative_radius": -0.6121204799717316,
+            "force_on_bean_world_n": [
+              0.0006430468876082551,
+              -2.4852747314467025e-05,
+              0.00046086006869020354
+            ]
+          },
+          "phase_motion": {
+            "entry": {
+              "start_position_m": [
+                0.46713283373127734,
+                -0.16431011840479315,
+                -0.011549506463682743
+              ],
+              "displacement_m": [
+                -2.7244023694472652e-05,
+                3.763035006101867e-05,
+                -4.3173848473035403e-07
+              ]
+            },
+            "sweep": {
+              "start_position_m": [
+                0.46710558970758287,
+                -0.16427248805473213,
+                -0.011549938202167473
+              ],
+              "displacement_m": [
+                0.008569605753227738,
+                -0.003815641003239889,
+                0.0005715989536685274
+              ]
+            }
+          },
+          "observation_duration_s": 10.0,
+          "achieved": [
+            {
+              "phase": "above",
+              "position_error_m": 0.0002660616654677045,
+              "orientation_error_rad": 0.009922772680275204
+            },
+            {
+              "phase": "pre_entry",
+              "position_error_m": 0.0006981492301337431,
+              "orientation_error_rad": 4.219168133681528e-05
+            },
+            {
+              "phase": "entry",
+              "position_error_m": 0.0006994858617561336,
+              "orientation_error_rad": 1.6487781699363503e-05
+            },
+            {
+              "phase": "sweep",
+              "position_error_m": 0.000699495532306876,
+              "orientation_error_rad": 4.06971883039215e-05
+            },
+            {
+              "phase": "wall_align",
+              "position_error_m": 0.0006139886255442768,
+              "orientation_error_rad": 0.00996134150042634
+            },
+            {
+              "phase": "wall_45",
+              "position_error_m": 0.0005375621561726645,
+              "orientation_error_rad": 0.009976682187610102
+            },
+            {
+              "phase": "wall_30",
+              "position_error_m": 0.0004403871699933004,
+              "orientation_error_rad": 0.00997399225872936
+            },
+            {
+              "phase": "wall_15",
+              "position_error_m": 0.0006998088409022574,
+              "orientation_error_rad": 0.006471236472555623
+            },
+            {
+              "phase": "wall_level",
+              "position_error_m": 0.0006983210162309778,
+              "orientation_error_rad": 0.007248073059007999
+            },
+            {
+              "phase": "clearance",
+              "position_error_m": 0.0006966931415031155,
+              "orientation_error_rad": 0.00010808890590403455
+            },
+            {
+              "phase": "wall_seat_tip",
+              "position_error_m": 8.433474550682958e-05,
+              "orientation_error_rad": 0.009996294033689627
+            },
+            {
+              "phase": "wall_seat_level",
+              "position_error_m": 9.504114588553106e-05,
+              "orientation_error_rad": 0.009976151999751208
+            }
+          ],
+          "path": [
+            {
+              "phase": "above",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.12440000000000001
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "pre_entry",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.02546193652041082
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "entry",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.00046193652041082167
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "sweep",
+              "position": [
+                0.45883065415601115,
+                -0.16799999999999998,
+                0.00046193652041082167
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_align",
+              "position": [
+                0.4669348798204054,
+                -0.174,
+                0.00710846680558248
+              ],
+              "rotation": [
+                [
+                  0.49240387650610423,
+                  0.17364817766693036,
+                  0.8528685319524433
+                ],
+                [
+                  -0.08682408883346521,
+                  0.9848077530122082,
+                  -0.1503837331804353
+                ],
+                [
+                  -0.8660254037844387,
+                  -1.3877787807814457e-17,
+                  0.5000000000000002
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_45",
+              "position": [
+                0.47342885707486826,
+                -0.174,
+                0.02194448068365414
+              ],
+              "rotation": [
+                [
+                  0.696364240320019,
+                  0.17364817766693033,
+                  0.696364240320019
+                ],
+                [
+                  -0.12278780396897285,
+                  0.9848077530122081,
+                  -0.12278780396897285
+                ],
+                [
+                  -0.7071067811865475,
+                  6.938893903907228e-18,
+                  0.7071067811865475
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_30",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.03363005397613486
+              ],
+              "rotation": [
+                [
+                  0.8528685319524433,
+                  0.17364817766693036,
+                  0.49240387650610407
+                ],
+                [
+                  -0.1503837331804353,
+                  0.9848077530122082,
+                  -0.08682408883346517
+                ],
+                [
+                  -0.5,
+                  0.0,
+                  0.8660254037844387
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_15",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.06302735608063671
+              ],
+              "rotation": [
+                [
+                  0.9512512425641977,
+                  0.17364817766693033,
+                  0.25488700224417876
+                ],
+                [
+                  -0.1677312594965206,
+                  0.9848077530122079,
+                  -0.04494345552754777
+                ],
+                [
+                  -0.2588190451025207,
+                  0.0,
+                  0.9659258262890682
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_level",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.08751820159984185
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "clearance",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "wall_seat_tip",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9810602621904069,
+                  0.17364817766693033,
+                  -0.0858316511774313
+                ],
+                [
+                  -0.17298739392508947,
+                  0.984807753012208,
+                  0.015134435901338623
+                ],
+                [
+                  0.08715574274765817,
+                  8.673617379884035e-19,
+                  0.9961946980917454
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_seat_level",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.005
+            }
+          ]
+        },
+        "seed_2": {
+          "seed": 2,
+          "reset_preset": "beans_in_bowl",
+          "picked_ids": [
+            "bean_000"
+          ],
+          "support_windows_s": [
+            9.733000000000045
+          ],
+          "first_entry_contact": {
+            "time_s": 11.847999999998873,
+            "phase": "sweep",
+            "bean_id": "bean_000",
+            "spoon_geom": "collision_spoon_scoop_coarse_prism_117",
+            "position_world_m": [
+              0.46219337116636255,
+              -0.16536991463744938,
+              -0.013998714521601537
+            ],
+            "position_tcp_m": [
+              0.019729025605670043,
+              0.0026289402566452218,
+              0.007466024873156175
+            ],
+            "height_relative_radius": -0.6121204799717316,
+            "force_on_bean_world_n": [
+              0.0006430468876082551,
+              -2.4852747314467025e-05,
+              0.00046086006869020354
+            ]
+          },
+          "phase_motion": {
+            "entry": {
+              "start_position_m": [
+                0.46713283373127734,
+                -0.16431011840479315,
+                -0.011549506463682743
+              ],
+              "displacement_m": [
+                -2.7244023694472652e-05,
+                3.763035006101867e-05,
+                -4.3173848473035403e-07
+              ]
+            },
+            "sweep": {
+              "start_position_m": [
+                0.46710558970758287,
+                -0.16427248805473213,
+                -0.011549938202167473
+              ],
+              "displacement_m": [
+                0.008569605753227738,
+                -0.003815641003239889,
+                0.0005715989536685274
+              ]
+            }
+          },
+          "observation_duration_s": 10.0,
+          "achieved": [
+            {
+              "phase": "above",
+              "position_error_m": 0.0002660616654677045,
+              "orientation_error_rad": 0.009922772680275204
+            },
+            {
+              "phase": "pre_entry",
+              "position_error_m": 0.0006981492301337431,
+              "orientation_error_rad": 4.219168133681528e-05
+            },
+            {
+              "phase": "entry",
+              "position_error_m": 0.0006994858617561336,
+              "orientation_error_rad": 1.6487781699363503e-05
+            },
+            {
+              "phase": "sweep",
+              "position_error_m": 0.000699495532306876,
+              "orientation_error_rad": 4.06971883039215e-05
+            },
+            {
+              "phase": "wall_align",
+              "position_error_m": 0.0006139886255442768,
+              "orientation_error_rad": 0.00996134150042634
+            },
+            {
+              "phase": "wall_45",
+              "position_error_m": 0.0005375621561726645,
+              "orientation_error_rad": 0.009976682187610102
+            },
+            {
+              "phase": "wall_30",
+              "position_error_m": 0.0004403871699933004,
+              "orientation_error_rad": 0.00997399225872936
+            },
+            {
+              "phase": "wall_15",
+              "position_error_m": 0.0006998088409022574,
+              "orientation_error_rad": 0.006471236472555623
+            },
+            {
+              "phase": "wall_level",
+              "position_error_m": 0.0006983210162309778,
+              "orientation_error_rad": 0.007248073059007999
+            },
+            {
+              "phase": "clearance",
+              "position_error_m": 0.0006966931415031155,
+              "orientation_error_rad": 0.00010808890590403455
+            },
+            {
+              "phase": "wall_seat_tip",
+              "position_error_m": 8.433474550682958e-05,
+              "orientation_error_rad": 0.009996294033689627
+            },
+            {
+              "phase": "wall_seat_level",
+              "position_error_m": 9.504114588553106e-05,
+              "orientation_error_rad": 0.009976151999751208
+            }
+          ],
+          "path": [
+            {
+              "phase": "above",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.12440000000000001
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "pre_entry",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.02546193652041082
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "entry",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.00046193652041082167
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "sweep",
+              "position": [
+                0.45883065415601115,
+                -0.16799999999999998,
+                0.00046193652041082167
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_align",
+              "position": [
+                0.4669348798204054,
+                -0.174,
+                0.00710846680558248
+              ],
+              "rotation": [
+                [
+                  0.49240387650610423,
+                  0.17364817766693036,
+                  0.8528685319524433
+                ],
+                [
+                  -0.08682408883346521,
+                  0.9848077530122082,
+                  -0.1503837331804353
+                ],
+                [
+                  -0.8660254037844387,
+                  -1.3877787807814457e-17,
+                  0.5000000000000002
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_45",
+              "position": [
+                0.47342885707486826,
+                -0.174,
+                0.02194448068365414
+              ],
+              "rotation": [
+                [
+                  0.696364240320019,
+                  0.17364817766693033,
+                  0.696364240320019
+                ],
+                [
+                  -0.12278780396897285,
+                  0.9848077530122081,
+                  -0.12278780396897285
+                ],
+                [
+                  -0.7071067811865475,
+                  6.938893903907228e-18,
+                  0.7071067811865475
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_30",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.03363005397613486
+              ],
+              "rotation": [
+                [
+                  0.8528685319524433,
+                  0.17364817766693036,
+                  0.49240387650610407
+                ],
+                [
+                  -0.1503837331804353,
+                  0.9848077530122082,
+                  -0.08682408883346517
+                ],
+                [
+                  -0.5,
+                  0.0,
+                  0.8660254037844387
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_15",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.06302735608063671
+              ],
+              "rotation": [
+                [
+                  0.9512512425641977,
+                  0.17364817766693033,
+                  0.25488700224417876
+                ],
+                [
+                  -0.1677312594965206,
+                  0.9848077530122079,
+                  -0.04494345552754777
+                ],
+                [
+                  -0.2588190451025207,
+                  0.0,
+                  0.9659258262890682
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_level",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.08751820159984185
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "clearance",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "wall_seat_tip",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9810602621904069,
+                  0.17364817766693033,
+                  -0.0858316511774313
+                ],
+                [
+                  -0.17298739392508947,
+                  0.984807753012208,
+                  0.015134435901338623
+                ],
+                [
+                  0.08715574274765817,
+                  8.673617379884035e-19,
+                  0.9961946980917454
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_seat_level",
+              "position": [
+                0.4799229740783869,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.005
+            }
+          ]
+        }
       }
     },
     "ur5e": {
       "status": "passed",
-      "m1": {
-        "report": "outputs/new_tableware/v2/m1/ur5e/report.json",
-        "passed_cases": 15
+      "passed_cases": 20,
+      "stages": {
+        "M1-A": "passed",
+        "M1-B": "passed",
+        "M1-C": "passed",
+        "M1-D": "passed",
+        "M3": "not_verified",
+        "M4": "not_verified"
       },
-      "m3": {
-        "report": "outputs/new_tableware/v2/m3/ur5e/report.json",
-        "passed_cases": 26,
-        "physical_cases": 21,
-        "seeds": [
-          0,
-          1,
-          2
-        ],
-        "baseline_runs": 63,
-        "comparisons": 126,
-        "maximum_convergence_errors": {
-          "event_time_s": 0.0015000000000000013,
-          "tcp_position_m": 3.588807599205031e-05,
-          "tcp_path_m": 4.151780056623026e-05,
-          "event_tcp_position_m": 3.7422716642567746e-05
+      "candidate_report": "outputs/single_bean/v1/m1/candidate/ur5e/m1d/m1d_report.json",
+      "report": "outputs/single_bean/v1/m1/ur5e/m1d/m1d_report.json",
+      "reset_max_difference": 0.0,
+      "settle_cases": 30,
+      "max_settle_penetration_m": 0.00011814111163624812,
+      "max_numerical_tcp_error_m": 0.0009970931709650877,
+      "pickup": {
+        "seed_0": {
+          "seed": 0,
+          "reset_preset": "beans_in_bowl",
+          "picked_ids": [
+            "bean_000"
+          ],
+          "support_windows_s": [
+            9.627000000000104
+          ],
+          "first_entry_contact": {
+            "time_s": 11.742999999998931,
+            "phase": "sweep",
+            "bean_id": "bean_000",
+            "spoon_geom": "collision_spoon_scoop_coarse_prism_117",
+            "position_world_m": [
+              0.46238455550664337,
+              -0.16536771381168283,
+              -0.014157776053835985
+            ],
+            "position_tcp_m": [
+              0.01972764079426807,
+              0.002629213872706445,
+              0.007466018275456866
+            ],
+            "height_relative_radius": -0.6518821044590605,
+            "force_on_bean_world_n": [
+              0.0006038893723862554,
+              -2.008556111409203e-05,
+              0.00047915710402324197
+            ]
+          },
+          "phase_motion": {
+            "entry": {
+              "start_position_m": [
+                0.467133311162407,
+                -0.16431077894868917,
+                -0.011549497631092826
+              ],
+              "displacement_m": [
+                -2.6879461240802982e-05,
+                3.712891572435484e-05,
+                -4.2934730858264214e-07
+              ]
+            },
+            "sweep": {
+              "start_position_m": [
+                0.46710643170116617,
+                -0.16427365003296482,
+                -0.011549926978401409
+              ],
+              "displacement_m": [
+                0.008577868496202568,
+                -0.0038272352457890957,
+                0.0005688159619170359
+              ]
+            }
+          },
+          "observation_duration_s": 10.0,
+          "achieved": [
+            {
+              "phase": "above",
+              "position_error_m": 0.00029204276307244524,
+              "orientation_error_rad": 0.009919430299832695
+            },
+            {
+              "phase": "pre_entry",
+              "position_error_m": 0.0006920186550260695,
+              "orientation_error_rad": 5.0966445001008705e-05
+            },
+            {
+              "phase": "entry",
+              "position_error_m": 0.0006983445596702499,
+              "orientation_error_rad": 9.965064425268431e-06
+            },
+            {
+              "phase": "sweep",
+              "position_error_m": 0.0006985940902655858,
+              "orientation_error_rad": 3.723502154883199e-05
+            },
+            {
+              "phase": "wall_align",
+              "position_error_m": 0.0006176739245719889,
+              "orientation_error_rad": 0.009951708429237269
+            },
+            {
+              "phase": "wall_45",
+              "position_error_m": 0.0005695326702405061,
+              "orientation_error_rad": 0.009980294694419514
+            },
+            {
+              "phase": "wall_30",
+              "position_error_m": 0.00046146003355518973,
+              "orientation_error_rad": 0.009961662850060109
+            },
+            {
+              "phase": "wall_15",
+              "position_error_m": 0.0006978917096878302,
+              "orientation_error_rad": 0.006388287206842921
+            },
+            {
+              "phase": "wall_level",
+              "position_error_m": 0.0006992698765142384,
+              "orientation_error_rad": 0.007555286594216661
+            },
+            {
+              "phase": "clearance",
+              "position_error_m": 0.0006942297338754183,
+              "orientation_error_rad": 6.541885783686654e-05
+            },
+            {
+              "phase": "wall_seat_tip",
+              "position_error_m": 0.0002051100874179436,
+              "orientation_error_rad": 0.009929937859124003
+            },
+            {
+              "phase": "wall_seat_level",
+              "position_error_m": 6.127503432202433e-05,
+              "orientation_error_rad": 0.0099356047936433
+            }
+          ],
+          "path": [
+            {
+              "phase": "above",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.12440000000000001
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "pre_entry",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.025461936520410833
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "entry",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.00046193652041083555
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "sweep",
+              "position": [
+                0.4588306541560112,
+                -0.16799999999999998,
+                0.00046193652041083555
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_align",
+              "position": [
+                0.46693487982040544,
+                -0.174,
+                0.007108466805582494
+              ],
+              "rotation": [
+                [
+                  0.49240387650610423,
+                  0.17364817766693036,
+                  0.8528685319524433
+                ],
+                [
+                  -0.08682408883346521,
+                  0.9848077530122082,
+                  -0.1503837331804353
+                ],
+                [
+                  -0.8660254037844387,
+                  -1.3877787807814457e-17,
+                  0.5000000000000002
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_45",
+              "position": [
+                0.4734288570748682,
+                -0.174,
+                0.02194448068365414
+              ],
+              "rotation": [
+                [
+                  0.696364240320019,
+                  0.17364817766693033,
+                  0.696364240320019
+                ],
+                [
+                  -0.12278780396897285,
+                  0.9848077530122081,
+                  -0.12278780396897285
+                ],
+                [
+                  -0.7071067811865475,
+                  6.938893903907228e-18,
+                  0.7071067811865475
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_30",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.03363005397613486
+              ],
+              "rotation": [
+                [
+                  0.8528685319524433,
+                  0.17364817766693036,
+                  0.49240387650610407
+                ],
+                [
+                  -0.1503837331804353,
+                  0.9848077530122082,
+                  -0.08682408883346517
+                ],
+                [
+                  -0.5,
+                  0.0,
+                  0.8660254037844387
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_15",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.06302735608063671
+              ],
+              "rotation": [
+                [
+                  0.9512512425641977,
+                  0.17364817766693033,
+                  0.25488700224417876
+                ],
+                [
+                  -0.1677312594965206,
+                  0.9848077530122079,
+                  -0.04494345552754777
+                ],
+                [
+                  -0.2588190451025207,
+                  0.0,
+                  0.9659258262890682
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_level",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.08751820159984183
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "clearance",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "wall_seat_tip",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9810602621904069,
+                  0.17364817766693033,
+                  -0.0858316511774313
+                ],
+                [
+                  -0.17298739392508947,
+                  0.984807753012208,
+                  0.015134435901338623
+                ],
+                [
+                  0.08715574274765817,
+                  8.673617379884035e-19,
+                  0.9961946980917454
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_seat_level",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.005
+            }
+          ]
         },
-        "snapshot_max_observation_error": 0.0,
-        "viewer": "passed"
+        "seed_1": {
+          "seed": 1,
+          "reset_preset": "beans_in_bowl",
+          "picked_ids": [
+            "bean_000"
+          ],
+          "support_windows_s": [
+            9.627000000000104
+          ],
+          "first_entry_contact": {
+            "time_s": 11.742999999998931,
+            "phase": "sweep",
+            "bean_id": "bean_000",
+            "spoon_geom": "collision_spoon_scoop_coarse_prism_117",
+            "position_world_m": [
+              0.46238455550664337,
+              -0.16536771381168283,
+              -0.014157776053835985
+            ],
+            "position_tcp_m": [
+              0.01972764079426807,
+              0.002629213872706445,
+              0.007466018275456866
+            ],
+            "height_relative_radius": -0.6518821044590605,
+            "force_on_bean_world_n": [
+              0.0006038893723862554,
+              -2.008556111409203e-05,
+              0.00047915710402324197
+            ]
+          },
+          "phase_motion": {
+            "entry": {
+              "start_position_m": [
+                0.467133311162407,
+                -0.16431077894868917,
+                -0.011549497631092826
+              ],
+              "displacement_m": [
+                -2.6879461240802982e-05,
+                3.712891572435484e-05,
+                -4.2934730858264214e-07
+              ]
+            },
+            "sweep": {
+              "start_position_m": [
+                0.46710643170116617,
+                -0.16427365003296482,
+                -0.011549926978401409
+              ],
+              "displacement_m": [
+                0.008577868496202568,
+                -0.0038272352457890957,
+                0.0005688159619170359
+              ]
+            }
+          },
+          "observation_duration_s": 10.0,
+          "achieved": [
+            {
+              "phase": "above",
+              "position_error_m": 0.00029204276307244524,
+              "orientation_error_rad": 0.009919430299832695
+            },
+            {
+              "phase": "pre_entry",
+              "position_error_m": 0.0006920186550260695,
+              "orientation_error_rad": 5.0966445001008705e-05
+            },
+            {
+              "phase": "entry",
+              "position_error_m": 0.0006983445596702499,
+              "orientation_error_rad": 9.965064425268431e-06
+            },
+            {
+              "phase": "sweep",
+              "position_error_m": 0.0006985940902655858,
+              "orientation_error_rad": 3.723502154883199e-05
+            },
+            {
+              "phase": "wall_align",
+              "position_error_m": 0.0006176739245719889,
+              "orientation_error_rad": 0.009951708429237269
+            },
+            {
+              "phase": "wall_45",
+              "position_error_m": 0.0005695326702405061,
+              "orientation_error_rad": 0.009980294694419514
+            },
+            {
+              "phase": "wall_30",
+              "position_error_m": 0.00046146003355518973,
+              "orientation_error_rad": 0.009961662850060109
+            },
+            {
+              "phase": "wall_15",
+              "position_error_m": 0.0006978917096878302,
+              "orientation_error_rad": 0.006388287206842921
+            },
+            {
+              "phase": "wall_level",
+              "position_error_m": 0.0006992698765142384,
+              "orientation_error_rad": 0.007555286594216661
+            },
+            {
+              "phase": "clearance",
+              "position_error_m": 0.0006942297338754183,
+              "orientation_error_rad": 6.541885783686654e-05
+            },
+            {
+              "phase": "wall_seat_tip",
+              "position_error_m": 0.0002051100874179436,
+              "orientation_error_rad": 0.009929937859124003
+            },
+            {
+              "phase": "wall_seat_level",
+              "position_error_m": 6.127503432202433e-05,
+              "orientation_error_rad": 0.0099356047936433
+            }
+          ],
+          "path": [
+            {
+              "phase": "above",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.12440000000000001
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "pre_entry",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.025461936520410833
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "entry",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.00046193652041083555
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "sweep",
+              "position": [
+                0.4588306541560112,
+                -0.16799999999999998,
+                0.00046193652041083555
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_align",
+              "position": [
+                0.46693487982040544,
+                -0.174,
+                0.007108466805582494
+              ],
+              "rotation": [
+                [
+                  0.49240387650610423,
+                  0.17364817766693036,
+                  0.8528685319524433
+                ],
+                [
+                  -0.08682408883346521,
+                  0.9848077530122082,
+                  -0.1503837331804353
+                ],
+                [
+                  -0.8660254037844387,
+                  -1.3877787807814457e-17,
+                  0.5000000000000002
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_45",
+              "position": [
+                0.4734288570748682,
+                -0.174,
+                0.02194448068365414
+              ],
+              "rotation": [
+                [
+                  0.696364240320019,
+                  0.17364817766693033,
+                  0.696364240320019
+                ],
+                [
+                  -0.12278780396897285,
+                  0.9848077530122081,
+                  -0.12278780396897285
+                ],
+                [
+                  -0.7071067811865475,
+                  6.938893903907228e-18,
+                  0.7071067811865475
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_30",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.03363005397613486
+              ],
+              "rotation": [
+                [
+                  0.8528685319524433,
+                  0.17364817766693036,
+                  0.49240387650610407
+                ],
+                [
+                  -0.1503837331804353,
+                  0.9848077530122082,
+                  -0.08682408883346517
+                ],
+                [
+                  -0.5,
+                  0.0,
+                  0.8660254037844387
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_15",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.06302735608063671
+              ],
+              "rotation": [
+                [
+                  0.9512512425641977,
+                  0.17364817766693033,
+                  0.25488700224417876
+                ],
+                [
+                  -0.1677312594965206,
+                  0.9848077530122079,
+                  -0.04494345552754777
+                ],
+                [
+                  -0.2588190451025207,
+                  0.0,
+                  0.9659258262890682
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_level",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.08751820159984183
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "clearance",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "wall_seat_tip",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9810602621904069,
+                  0.17364817766693033,
+                  -0.0858316511774313
+                ],
+                [
+                  -0.17298739392508947,
+                  0.984807753012208,
+                  0.015134435901338623
+                ],
+                [
+                  0.08715574274765817,
+                  8.673617379884035e-19,
+                  0.9961946980917454
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_seat_level",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.005
+            }
+          ]
+        },
+        "seed_2": {
+          "seed": 2,
+          "reset_preset": "beans_in_bowl",
+          "picked_ids": [
+            "bean_000"
+          ],
+          "support_windows_s": [
+            9.627000000000104
+          ],
+          "first_entry_contact": {
+            "time_s": 11.742999999998931,
+            "phase": "sweep",
+            "bean_id": "bean_000",
+            "spoon_geom": "collision_spoon_scoop_coarse_prism_117",
+            "position_world_m": [
+              0.46238455550664337,
+              -0.16536771381168283,
+              -0.014157776053835985
+            ],
+            "position_tcp_m": [
+              0.01972764079426807,
+              0.002629213872706445,
+              0.007466018275456866
+            ],
+            "height_relative_radius": -0.6518821044590605,
+            "force_on_bean_world_n": [
+              0.0006038893723862554,
+              -2.008556111409203e-05,
+              0.00047915710402324197
+            ]
+          },
+          "phase_motion": {
+            "entry": {
+              "start_position_m": [
+                0.467133311162407,
+                -0.16431077894868917,
+                -0.011549497631092826
+              ],
+              "displacement_m": [
+                -2.6879461240802982e-05,
+                3.712891572435484e-05,
+                -4.2934730858264214e-07
+              ]
+            },
+            "sweep": {
+              "start_position_m": [
+                0.46710643170116617,
+                -0.16427365003296482,
+                -0.011549926978401409
+              ],
+              "displacement_m": [
+                0.008577868496202568,
+                -0.0038272352457890957,
+                0.0005688159619170359
+              ]
+            }
+          },
+          "observation_duration_s": 10.0,
+          "achieved": [
+            {
+              "phase": "above",
+              "position_error_m": 0.00029204276307244524,
+              "orientation_error_rad": 0.009919430299832695
+            },
+            {
+              "phase": "pre_entry",
+              "position_error_m": 0.0006920186550260695,
+              "orientation_error_rad": 5.0966445001008705e-05
+            },
+            {
+              "phase": "entry",
+              "position_error_m": 0.0006983445596702499,
+              "orientation_error_rad": 9.965064425268431e-06
+            },
+            {
+              "phase": "sweep",
+              "position_error_m": 0.0006985940902655858,
+              "orientation_error_rad": 3.723502154883199e-05
+            },
+            {
+              "phase": "wall_align",
+              "position_error_m": 0.0006176739245719889,
+              "orientation_error_rad": 0.009951708429237269
+            },
+            {
+              "phase": "wall_45",
+              "position_error_m": 0.0005695326702405061,
+              "orientation_error_rad": 0.009980294694419514
+            },
+            {
+              "phase": "wall_30",
+              "position_error_m": 0.00046146003355518973,
+              "orientation_error_rad": 0.009961662850060109
+            },
+            {
+              "phase": "wall_15",
+              "position_error_m": 0.0006978917096878302,
+              "orientation_error_rad": 0.006388287206842921
+            },
+            {
+              "phase": "wall_level",
+              "position_error_m": 0.0006992698765142384,
+              "orientation_error_rad": 0.007555286594216661
+            },
+            {
+              "phase": "clearance",
+              "position_error_m": 0.0006942297338754183,
+              "orientation_error_rad": 6.541885783686654e-05
+            },
+            {
+              "phase": "wall_seat_tip",
+              "position_error_m": 0.0002051100874179436,
+              "orientation_error_rad": 0.009929937859124003
+            },
+            {
+              "phase": "wall_seat_level",
+              "position_error_m": 6.127503432202433e-05,
+              "orientation_error_rad": 0.0099356047936433
+            }
+          ],
+          "path": [
+            {
+              "phase": "above",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.12440000000000001
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "pre_entry",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.025461936520410833
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "entry",
+              "position": [
+                0.445,
+                -0.16799999999999998,
+                0.00046193652041083555
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "sweep",
+              "position": [
+                0.4588306541560112,
+                -0.16799999999999998,
+                0.00046193652041083555
+              ],
+              "rotation": [
+                [
+                  0.42261826174069955,
+                  0.0,
+                  0.9063077870366499
+                ],
+                [
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  -0.9063077870366499,
+                  0.0,
+                  0.42261826174069955
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_align",
+              "position": [
+                0.46693487982040544,
+                -0.174,
+                0.007108466805582494
+              ],
+              "rotation": [
+                [
+                  0.49240387650610423,
+                  0.17364817766693036,
+                  0.8528685319524433
+                ],
+                [
+                  -0.08682408883346521,
+                  0.9848077530122082,
+                  -0.1503837331804353
+                ],
+                [
+                  -0.8660254037844387,
+                  -1.3877787807814457e-17,
+                  0.5000000000000002
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_45",
+              "position": [
+                0.4734288570748682,
+                -0.174,
+                0.02194448068365414
+              ],
+              "rotation": [
+                [
+                  0.696364240320019,
+                  0.17364817766693033,
+                  0.696364240320019
+                ],
+                [
+                  -0.12278780396897285,
+                  0.9848077530122081,
+                  -0.12278780396897285
+                ],
+                [
+                  -0.7071067811865475,
+                  6.938893903907228e-18,
+                  0.7071067811865475
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_30",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.03363005397613486
+              ],
+              "rotation": [
+                [
+                  0.8528685319524433,
+                  0.17364817766693036,
+                  0.49240387650610407
+                ],
+                [
+                  -0.1503837331804353,
+                  0.9848077530122082,
+                  -0.08682408883346517
+                ],
+                [
+                  -0.5,
+                  0.0,
+                  0.8660254037844387
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_15",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.06302735608063671
+              ],
+              "rotation": [
+                [
+                  0.9512512425641977,
+                  0.17364817766693033,
+                  0.25488700224417876
+                ],
+                [
+                  -0.1677312594965206,
+                  0.9848077530122079,
+                  -0.04494345552754777
+                ],
+                [
+                  -0.2588190451025207,
+                  0.0,
+                  0.9659258262890682
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_level",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.08751820159984183
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "clearance",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.03
+            },
+            {
+              "phase": "wall_seat_tip",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9810602621904069,
+                  0.17364817766693033,
+                  -0.0858316511774313
+                ],
+                [
+                  -0.17298739392508947,
+                  0.984807753012208,
+                  0.015134435901338623
+                ],
+                [
+                  0.08715574274765817,
+                  8.673617379884035e-19,
+                  0.9961946980917454
+                ]
+              ],
+              "speed_m_s": 0.005
+            },
+            {
+              "phase": "wall_seat_level",
+              "position": [
+                0.47992297407838685,
+                -0.174,
+                0.1644
+              ],
+              "rotation": [
+                [
+                  0.9848077530122081,
+                  0.17364817766693033,
+                  0.0
+                ],
+                [
+                  -0.17364817766693033,
+                  0.9848077530122081,
+                  -0.0
+                ],
+                [
+                  -0.0,
+                  0.0,
+                  1.0
+                ]
+              ],
+              "speed_m_s": 0.005
+            }
+          ]
+        }
       }
     }
   },
-  "preserved_evidence": [
-    "outputs/m0",
-    "outputs/new_tableware/v1/m1/panda",
-    "outputs/new_tableware/v1/m1/ur5e"
-  ]
+  "pytest": {
+    "tests": 137,
+    "failures": 0,
+    "log": "outputs/single_bean/v1/m1/candidate/regression.log"
+  },
+  "release_authority": "outputs/single_bean/v1/m1/freeze_manifest.json",
+  "excluded_cases": {
+    "double_contact": "not_applicable: single-bean prototype"
+  },
+  "preserved_attempts": [
+    "outputs/single_bean/v1/m1/candidate_sandbox_interrupted",
+    "outputs/single_bean/v1/m1/candidate_before_drop_horizon_fix"
+  ],
+  "drop_diagnostic": {
+    "speed_m_s": 1.5,
+    "acceleration_m_s2": 100.0,
+    "servo_gain_scale": 4.0,
+    "confirm_s": 0.1,
+    "observation_end_s": 0.5,
+    "first_drop_time_recorded": true
+  }
 }

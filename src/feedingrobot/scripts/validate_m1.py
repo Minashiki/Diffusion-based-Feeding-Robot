@@ -1,407 +1,349 @@
-"""Physical M1 acceptance with frozen thresholds and machine-readable evidence."""
+"""Complete native Beans M1 acceptance and joint Panda/UR5e freeze."""
 
 from __future__ import annotations
 
 import argparse
-import csv
+import copy
 import hashlib
+import importlib.metadata
 import json
-import time
-import subprocess
+from pathlib import Path
+import pickle
+import platform
 import sys
+import time
 import traceback
 
-import mink
 import mujoco
 import numpy as np
 
-from feedingrobot.sim.model import ROOT, asset_files, load_json, named_id
+from feedingrobot.sim.model import ROOT, asset_files, load_json
 from feedingrobot.sim.task import FeedingTask
+from feedingrobot.scripts import validate_m1a as a, validate_m1b as b, validate_m1c as c
+
+SETTINGS = {'baseline': (.001, 100, 1e-8), 'dt05ms': (.0005, 100, 1e-8),
+            'iterations200': (.001, 200, 1e-10)}
+CONTROL_CASES = ('hold', 'tracking', 'wrench', 'faults', 'reset', 'head', 'carry',
+                 'tilt', 'acceleration', 'reachability', 'guards',
+                 'sweep_seed_0', 'sweep_seed_1', 'sweep_seed_2')
+MOTION_CASES = tuple(n for n in CONTROL_CASES if n not in ('reset', 'guards'))
+REQUIRED = CONTROL_CASES + ('assembly', 'contacts', 'convergence', 'viewer', 'performance', 'manifest')
 
 
-def angle_error(a, b):
-    return float(np.linalg.norm((mink.SO3.from_matrix(a) @ mink.SO3.from_matrix(b).inverse()).log()))
+def write_json(path, value):
+    path.write_text(json.dumps(b.serializable(value), indent=2, allow_nan=False) + '\n')
 
 
-def advance(task, seconds, trace=None):
-    state = task.snapshot()
-    for _ in range(round(seconds / task.dt)):
-        state = task.step_physics()
-        if trace is not None:
-            trace.append({"time": state["time"], "tcp_x": state["tcp_position"][0],
-                          "tcp_y": state["tcp_position"][1], "tcp_z": state["tcp_position"][2],
-                          "peak_force_n": state["contact_peak_n"],
-                          "impulse_ns": state["contact_impulse_ns"],
-                          "max_joint_speed": float(np.max(np.abs(state["dq"]))),
-                          "wrist_force_n": float(np.linalg.norm(state["compensated_wrench"][:3])),
-                          "status": state["execution_status"]})
-        assert not task.terminated, task.failure_reason
-        assert task.adapter.fault is None, (task.adapter.fault, getattr(task.adapter, "error_detail", ""))
-    return state
+def input_hashes():
+    # Both robot assets/configs belong to a single shared version. Outputs and
+    # the freeze manifest are deliberately excluded to avoid recursive hashes.
+    paths = set(asset_files())
+    for folder, pattern in [('src/feedingrobot', '*.py'), ('tests', '*.py'), ('docs', '*')]:
+        paths.update(p for p in (ROOT / folder).rglob(pattern) if p.is_file())
+    paths.update(ROOT / name for name in ('README.md', 'SimModelPlann.md', 'assets/task/tableware/README.md',
+                 'requirements.txt', 'requirements.lock.txt', 'pyproject.toml', 'third_party_manifest.json'))
+    return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 
 
-def supported(task):
-    from feedingrobot.sim.events import evidence
-    return evidence(task)["supported"]
+def restore_numerical_state(task, state):
+    """Acceptance-only replay; public set_state retains strict compatibility."""
+    if state is None:
+        raise ValueError('Missing complete episode reset state')
+    opt = task.model.opt
+    saved = (opt.timestep, opt.iterations, opt.tolerance)
+    try:
+        opt.timestep, opt.iterations, opt.tolerance = SETTINGS['baseline']
+        # The serialized compiled model verifies structure, assets and all other
+        # numeric/control parameters. Only these three solver settings may vary.
+        if task.state_signature() != state['signature']:
+            raise ValueError('Numerical replay has incompatible non-numerical inputs')
+        task.set_state(state)
+    finally:
+        opt.timestep, opt.iterations, opt.tolerance = saved
+    task.tick = round(task.data.time / task.dt)
+    task.physics_timing = dict(mj_step_s=0., forward_s=0., steps=0)
 
 
-def plate(task, cfg, trace):
-    task.reset(preset="food_on_plate")
-    advance(task, .3, trace)
-    start = task.snapshot()["food_position"].copy()
-    advance(task, cfg["support_hold_s"], trace)
-    assert any({row["group1"], row["group2"]} == {"food", "plate"} for row in task.contacts)
-    drift = float(np.linalg.norm(task.snapshot()["food_position"] - start))
-    assert drift < cfg["support_drift_m"], drift
-    return dict(duration_s=cfg["support_hold_s"], food_drift_m=drift)
+def compare_motion(base, other, left, right, cfg):
+    if base['status'] != 'passed' or other['status'] != 'passed':
+        raise AssertionError('Each numerical setting must pass the original case')
+    def samples(rows):
+        times = np.array([row['time_s'] for row in rows])
+        if not len(times) or not np.isfinite(times).all() or np.any(np.diff(times) <= 0):
+            raise AssertionError('Missing, nonfinite or duplicate trajectory samples')
+        grid = np.rint(times / .01).astype(int)
+        if not np.allclose(times, grid * .01, atol=1e-8) or np.any(np.diff(grid) != 1) or grid[0] != 1:
+            raise AssertionError('Missing common-grid trajectory samples')
+        for row in rows:
+            for key in ('tcp_position', 'tcp_rotation', 'bean_positions', 'compensated_wrench'):
+                if not np.isfinite(row[key]).all():
+                    raise AssertionError(f'Nonfinite trajectory {key}')
+        return rows
+    left, right = samples(left), samples(right)
+    for result in (base, other):
+        for key in ('final_tcp_position', 'final_tcp_rotation', 'max_wrist_force_n'):
+            assert np.isfinite(result[key]).all(), f'Nonfinite terminal metric {key}'
+    count = min(len(left), len(right))
+    positions = [np.linalg.norm(np.array(x['tcp_position']) - y['tcp_position']) for x,y in zip(left[:count],right[:count])]
+    rotations = [c.angle_error(np.array(x['tcp_rotation']), np.array(y['tcp_rotation'])) for x,y in zip(left[:count],right[:count])]
+    positions.append(np.linalg.norm(np.array(base['final_tcp_position']) - other['final_tcp_position']))
+    rotations.append(c.angle_error(np.array(base['final_tcp_rotation']), np.array(other['final_tcp_rotation'])))
+    metrics = dict(common_samples=count, max_tcp_position_error_m=float(max(positions)),
+                   max_tcp_rotation_error_rad=float(max(rotations)),
+                   duration_difference_s=right[-1]['time_s']-left[-1]['time_s'],
+                   bean_position_divergence_m=np.max([np.linalg.norm(np.array(x['bean_positions'])-y['bean_positions'],axis=1)
+                       for x,y in zip(left[:count],right[:count])], axis=0))
+    assert metrics['max_tcp_position_error_m'] <= cfg['convergence_position_m'], metrics
+    assert metrics['max_tcp_rotation_error_rad'] <= cfg['convergence_rotation_rad'], metrics
+    def difference(x, y, absolute, relative, label):
+        assert np.isfinite([x,y]).all(), f'Nonfinite {label}'
+        delta, limit = abs(x-y), max(absolute, abs(x)*relative)
+        assert delta <= limit, f'{label}: difference={delta}, tolerance={limit}, baseline={x}, variant={y}'
+        return dict(difference=delta, tolerance=limit)
+    metrics['wrist_peak'] = difference(base['max_wrist_force_n'], other['max_wrist_force_n'],
+        cfg['convergence_force_absolute_n'], cfg['convergence_force_relative'], 'wrist_peak_n')
+    for field, absolute, relative in [('semantic_pair_peaks_n', 'convergence_force_absolute_n', 'convergence_force_relative'),
+                                     ('semantic_pair_impulses_ns', 'convergence_impulse_absolute_ns', 'convergence_impulse_relative')]:
+        metrics[field] = {key: difference(base[field].get(key,0.),other[field].get(key,0.),cfg[absolute],cfg[relative], f'{field}:{key}')
+                         for key in base[field].keys() | other[field].keys()}
+    bm, om = base['metrics'], other['metrics']
+    if 'picked_ids' in bm:
+        metrics.update(baseline_picked_ids=bm['picked_ids'], picked_ids=om['picked_ids'],
+                       baseline_phases=[r['phase'] for r in bm['achieved']], phases=[r['phase'] for r in om['achieved']])
+    if 'dropped' in bm:
+        assert bm['bean_id'] == om['bean_id'] == 'bean_000' and bm['dropped'] and om['dropped']
+        metrics['drop_time_difference_s'] = om['time_s'] - bm['time_s']
+    return metrics
 
 
-def holding(task, cfg, trace):
-    task.reset(preset="empty")
-    start = task.snapshot()
-    final = advance(task, cfg["hold_duration_s"], trace)
-    pos = float(np.linalg.norm(final["tcp_position"] - start["tcp_position"]))
-    rot = angle_error(final["tcp_rotation"], start["tcp_rotation"])
-    assert pos < cfg["hold_position_error_m"], pos
-    assert rot < cfg["hold_orientation_error_rad"], rot
-    return dict(position_drift_m=pos, rotation_drift_rad=rot,
-                gravity_joint_offset_rad=(final["q"] - task.robot_config["reset_q"]).tolist(),
-                gravcomp=task.robot_config["gravcomp"])
+def convergence(robot, output, baseline):
+    cfg = load_json('configs/acceptance.json')
+    variants = {}
+    for name, setting in list(SETTINGS.items())[1:]:
+        folder = output / name
+        report = c.validate(robot, folder, MOTION_CASES, numerical=setting, replay=output/'baseline')
+        comparisons = {}
+        for case in MOTION_CASES:
+            left = right = matches = None
+            try:
+                left = json.loads((output/'baseline'/f'{case}_trajectory.json').read_text())
+                right = json.loads((folder/f'{case}_trajectory.json').read_text())
+                with (output/'baseline'/f'{case}_states.pkl').open('rb') as file:
+                    reference = pickle.load(file)['episode_reset']
+                with (folder/f'{case}_states.pkl').open('rb') as file:
+                    restored = pickle.load(file)['episode_reset']
+                assert reference is not None and restored is not None, 'Missing complete reset snapshot'
+                matches = dict(integration=np.array_equal(reference['physics'], restored['physics']),
+                    boundary=all(np.array_equal(reference['boundary'][key], restored['boundary'][key])
+                                 for key in ('qacc', 'sensordata')),
+                    adapter=all(np.array_equal(reference['adapter'][key], restored['adapter'][key])
+                                for key in ('reference_q', 'target', 'velocity', 'last_ik_velocity')),
+                    monitor=reference['monitor']==restored['monitor'],
+                    driver_clock=reference['task']['scenario_state']==restored['task']['scenario_state'])
+                assert all(matches.values()), f'Initial replay mismatch: {matches}'
+                comparisons[case] = dict(status='passed', initial_state_matches=matches, metrics=compare_motion(
+                    baseline['cases'][case], report['cases'][case], left, right, cfg))
+            except Exception:
+                comparisons[case] = dict(status='failed', error=traceback.format_exc(), initial_state_matches=matches,
+                    baseline_statistics={key: baseline['cases'][case].get(key) for key in
+                        ('metrics', 'max_wrist_force_n', 'semantic_pair_peaks_n', 'semantic_pair_impulses_ns',
+                         'final_tcp_position', 'final_tcp_rotation')},
+                    variant_statistics={key: report['cases'][case].get(key) for key in
+                        ('metrics', 'max_wrist_force_n', 'semantic_pair_peaks_n', 'semantic_pair_impulses_ns',
+                         'final_tcp_position', 'final_tcp_rotation')})
+            bm = baseline['cases'][case].get('metrics', {})
+            om = report['cases'][case].get('metrics', {})
+            if bm.get('dropped') and om.get('dropped'):
+                comparisons[case]['drop_time_difference_s'] = om['time_s'] - bm['time_s']
+            if 'picked_ids' in bm and 'picked_ids' in om:
+                comparisons[case].update(baseline_picked_ids=bm['picked_ids'], picked_ids=om['picked_ids'],
+                    baseline_phases=[row['phase'] for row in bm['achieved']],
+                    phases=[row['phase'] for row in om['achieved']])
+            if left and right:
+                count = min(len(left), len(right))
+                if np.allclose([row['time_s'] for row in left[:count]], [row['time_s'] for row in right[:count]], atol=1e-8):
+                    divergence = np.array([np.linalg.norm(np.array(x['bean_positions'])-y['bean_positions'],axis=1)
+                                          for x,y in zip(left[:count], right[:count])])
+                    if np.isfinite(divergence).all():
+                        comparisons[case]['bean_position_divergence_m'] = divergence.max(axis=0)
+        variants[name] = dict(status='passed' if all(v['status']=='passed' for v in comparisons.values()) else 'failed',
+                             solver=setting, comparisons=comparisons, report=str(folder/'m1c_report.json'))
+    return dict(status='passed' if all(v['status']=='passed' for v in variants.values()) else 'failed', variants=variants)
 
 
-def tracking(task, cfg, trace):
-    task.reset(preset="empty")
-    errors, rotation_errors, speeds, saturation = [], [], [], 0
-    # Each of the six action axes has its own excitation.
-    for axis in range(6):
-        twist = np.zeros(6)
-        twist[axis] = .01 if axis < 3 else .05
-        now = task.data.time
-        task.adapter.set_twist(twist, now, now + .45)
-        for _ in range(round(.4 / task.dt)):
-            state = advance(task, task.dt, trace)
-            errors.append(float(np.linalg.norm(state["tcp_position"] - task.adapter.target.translation())))
-            rotation_errors.append(angle_error(state["tcp_rotation"], task.adapter.target.rotation().as_matrix()))
-            speeds.append(float(np.max(np.abs(state["dq"]))))
-            force = state["actuator_force"]
-            limits = task.model.actuator_forcerange[task.index.actuators]
-            saturation += int(np.any(np.isclose(force, limits[:, 0], atol=1e-5) | np.isclose(force, limits[:, 1], atol=1e-5)))
-    task.adapter.stop()
-    final = advance(task, cfg["stop_settle_s"], trace)
-    assert max(errors) < cfg["tracking_position_error_m"], max(errors)
-    assert max(rotation_errors) < cfg["tracking_orientation_error_rad"], max(rotation_errors)
-    assert np.linalg.norm(final["tcp_twist_world"][:3]) < cfg["stop_linear_speed_m_s"]
-    assert np.linalg.norm(final["tcp_twist_world"][3:]) < cfg["stop_angular_speed_rad_s"]
-    return dict(max_tracking_error_m=max(errors), max_rotation_error_rad=max(rotation_errors),
-                max_joint_speed_rad_s=max(speeds), actuator_saturation_ticks=saturation,
-                final_twist=final["tcp_twist_world"].tolist())
-
-
-def reset_check(task, cfg, trace):
-    signatures = []
-    for iteration in range(cfg["reset_count"]):
-        task.data.xfrc_applied[:] = 2
-        task.data.qfrc_applied[:] = 3
-        task.monitor.events.append({"stale": True})
-        task.monitor.peak_n = 999
-        task.adapter.stop("injected", fault=True)
-        task.external_wrench = np.ones((3, 3))
-        state = task.reset(seed=7, preset="food_on_plate")
-        assert not task.monitor.events and task.monitor.peak_n == 0
-        assert task.external_wrench is None and task.adapter.command is None and task.adapter.fault is None
-        assert not task.data.xfrc_applied.any() and not task.data.qfrc_applied.any()
-        assert not task.adapter.velocity.any() and task.tick == 0 and task.data.time == 0
-        signatures.append(np.r_[task.data.qpos, task.data.qvel, task.data.ctrl])
-        if iteration:
-            np.testing.assert_allclose(signatures[-1], signatures[0], rtol=0, atol=cfg["reset_atol"])
-    return dict(resets=len(signatures), max_difference=float(np.max(np.abs(np.array(signatures) - signatures[0]))))
-
-
-def wrench_check(task, cfg, trace):
-    task.reset(preset="empty")
-    force_errors, torque_errors, residuals = [], [], []
-    for direction in np.r_[np.eye(3), -np.eye(3)]:
-        point = task.data.site_xpos[task.index.tcp].copy() + np.array([.03, -.02, .01])
-        torque = np.array([.01, -.02, .03])
-        task.set_external_wrench(direction, torque, point)
-        state = advance(task, .02, trace)
-        expected_torque = torque + np.cross(point - state["tcp_position"], direction)
-        force_errors.append(float(np.max(np.abs(state["compensated_wrench"][:3] - direction))))
-        torque_errors.append(float(np.max(np.abs(state["compensated_wrench"][3:] - expected_torque))))
-    task.clear_external_wrench()
-    now = task.data.time
-    task.adapter.set_twist([.01, -.01, .01, .03, -.02, .01], now, now + .5)
-    for _ in range(round(.4 / task.dt)):
-        state = advance(task, task.dt, trace)
-        residuals.append(state["compensated_wrench"].copy())
-    maximum = np.max(np.abs(residuals), axis=0)
-    assert max(force_errors) < cfg["wrench_force_error_n"], force_errors
-    assert max(torque_errors) < cfg["wrench_torque_error_nm"], torque_errors
-    assert np.max(maximum[:3]) < cfg["wrench_force_error_n"], maximum
-    assert np.max(maximum[3:]) < cfg["wrench_torque_error_nm"], maximum
-    return dict(force_error_n=max(force_errors), torque_error_nm=max(torque_errors), dynamic_residual=maximum.tolist())
-
-
-def carry(task, cfg, trace, seed=0):
-    task.reset(seed=seed, preset="food_on_spoon")
-    advance(task, .3, trace)
-    assert supported(task), "Food did not settle on spoon"
-    advance(task, cfg["support_hold_s"], trace)
-    assert supported(task), "Food lost during static support"
-    now = task.data.time
-    task.adapter.set_twist([.008, 0, .003, 0, 0, 0], now, now + 1.1)
-    advance(task, 1., trace)
-    assert supported(task), "Food lost during gentle carry"
-    return dict(food_supported=True, peak_force_n=task.monitor.peak_n, impulse_ns=task.monitor.impulse_ns,
-                tcp_position=task.snapshot()["tcp_position"].tolist(),
-                tcp_rotation=task.snapshot()["tcp_rotation"].tolist())
-
-
-def drop(task, cfg, trace, kind):
-    task.reset(preset="food_on_spoon")
-    advance(task, .3, trace)
-    assert supported(task)
-    rotation = task.snapshot()["tcp_rotation"]
-    base = task.data.site_xmat[task.index.base].reshape(3, 3)
-    if kind == "tilt":
-        command = np.r_[np.zeros(3), base.T @ rotation[:, 1] * .4]
-        duration = 4.
-    else:
-        # Recreate limits before running the explicitly labelled drop diagnostic.
-        task.robot_config.update({k: v for k, v in cfg["acceleration_diagnostic"].items()
-                                  if k in task.robot_config})
-        task.scene_config["joint_speed_fault_rad_s"] = cfg["acceleration_diagnostic"]["joint_speed_fault_rad_s"]
-        from feedingrobot.control.adapter import RobotAdapter
-        task.adapter = RobotAdapter(task.model, task.data, task.index, task.robot_config)
-        gain = cfg["acceleration_diagnostic"]["servo_gain_scale"]
-        ids = task.index.actuators
-        task.model.actuator_gainprm[ids, 0] *= gain
-        task.model.actuator_biasprm[ids, 1] *= gain
-        task.model.actuator_biasprm[ids, 2] *= np.sqrt(gain)
-        command = np.r_[-base.T @ rotation[:, 1] * cfg["acceleration_diagnostic"]["linear_speed_limit"], np.zeros(3)]
-        duration = .65
-    now = task.data.time
-    task.adapter.set_twist(command, now, now + duration + .01)
-    absence = 0.
-    max_accel, previous_velocity = 0., task.snapshot()["tcp_twist_world"][:3]
-    max_speed = 0.
-    for _ in range(round(duration / task.dt)):
-        state = advance(task, task.dt, trace)
-        max_accel = max(max_accel, float(np.linalg.norm(state["tcp_twist_world"][:3] - previous_velocity) / task.dt))
-        previous_velocity = state["tcp_twist_world"][:3]
-        max_speed = max(max_speed, float(np.max(np.abs(state["dq"]))))
-        absence = 0 if supported(task) else absence + task.dt
-        relative = state["tcp_rotation"].T @ (state["food_position"] - state["tcp_position"])
-        outside = (np.any(relative < task.task_config["spoon_support_min_m"])
-                   or np.any(relative > task.task_config["spoon_support_max_m"]))
-        if absence >= cfg["support_confirm_s"] and outside:
-            break
-    assert absence >= cfg["support_confirm_s"], f"Food did not drop under {kind}"
-    final_relative = state["tcp_rotation"].T @ (state["food_position"] - state["tcp_position"])
-    lo, hi = np.array(task.task_config["spoon_support_min_m"]), np.array(task.task_config["spoon_support_max_m"])
-    assert np.any(final_relative < lo) or np.any(final_relative > hi), final_relative
-    return dict(dropped=True, absent_s=absence, final_relative_position=final_relative.tolist(), max_tcp_acceleration_m_s2=max_accel,
-                max_joint_speed_rad_s=max_speed, diagnostic_limits=cfg["acceleration_diagnostic"] if kind == "acceleration" else None)
-
-
-def assembly(task, cfg, trace):
-    idx, model = task.index, task.model
-    assert len(idx.spoon_geoms) == 145 and len(idx.scoop_geoms) == 130 and len(idx.handle_geoms) == 15
-    assert len(idx.plate_geoms) == 17 and model.npair == 145
-    assert all(idx.group(model, g) == "spoon" for g in idx.spoon_geoms)
-    assert all(idx.group(model, g) == "plate" for g in idx.plate_geoms)
-    assert set(model.pair_geom1).issubset(idx.spoon_geoms)
-    assert set(model.pair_geom2).issubset(idx.plate_geoms)
-    assert np.isclose(idx.tool_mass, .035) and model.body_mass[idx.tool_body] == 0
-    assert not any("bowl" in (mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, g) or "")
-                   for g in range(model.ngeom))
-    for name in ("dynamic_spoon2_freejoint", "dynamic_plate2_freejoint"):
-        assert mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name) == -1
-    advance(task, .02, trace)
-    assert all(row["distance"] >= -.001 for row in task.contacts)
-    return dict(spoon_collision_count=145, scoop_collision_count=130, plate_collision_count=17,
-                source_pair_count=145, tool_mass_kg=idx.tool_mass,
-                robot_config=task.robot_config, scene_config=task.scene_config)
-
-
-def move_to(task, position, cfg, trace):
-    base = task.data.site_xmat[task.index.base].reshape(3, 3)
-    for tick in range(round(cfg["reachability_timeout_s"] / task.dt)):
-        state = task.snapshot()
-        delta = position - state["tcp_position"]
-        angular = mink.SO3.from_matrix(state["tcp_rotation"]).inverse().log()
-        if np.linalg.norm(delta) < .004 and np.linalg.norm(angular) < .03:
-            task.adapter.stop("stopped", hold_reference=True)
-            return advance(task, .5, trace)
-        if tick % 20 == 0:
-            now = task.data.time
-            task.adapter.set_twist(np.r_[base.T @ delta * 3., base.T @ angular * 3.], now, now + .04)
-        advance(task, task.dt, trace)
-        assert not any("arm" in (row["group1"], row["group2"]) and row["force_n"] > 1e-5
-                       for row in task.contacts), "Forbidden arm contact on the path"
-    raise AssertionError(f"Actual servo motion could not reach {position}: {task.snapshot()['tcp_position']}")
-
-
-def reachability(task, cfg, trace):
-    task.reset(preset="empty")
-    results = {}
-    plate = task.data.site_xpos[named_id(task.model, mujoco.mjtObj.mjOBJ_SITE, "plate_frame")].copy()
-    mouth = task.data.site_xpos[named_id(task.model, mujoco.mjtObj.mjOBJ_SITE, "mouth_entry")].copy()
-    for name, position in [("plate_above", plate + [0, 0, .14]),
-                           ("plate_low", plate + [0, 0, .05]),
-                           ("carry_clearance", plate + [0, 0, .18]),
-                           ("mouth_wait", mouth + [-.06, 0, 0])]:
-        final = move_to(task, position, cfg, trace)
-        error = float(np.linalg.norm(final["tcp_position"] - position))
-        assert error < cfg["tracking_position_error_m"], (name, error)
-        assert angle_error(final["tcp_rotation"], np.eye(3)) < cfg["tracking_orientation_error_rad"]
-        forbidden = [row for row in task.contacts if "arm" in (row["group1"], row["group2"]) and row["force_n"] > 1e-5]
-        assert not forbidden, forbidden
-        results[name] = dict(position_error_m=error, actual_q=final["q"].tolist(),
-                             kind="actual IK/position-servo/physics path; not full feeding success")
-    return results
-
-
-def dynamic_head(task, cfg, trace):
-    task.scene_config["head_fixed"] = False
-    task.reset(preset="food_on_plate")
-    samples = []
-    for _ in range(round(2. / task.dt)):
-        advance(task, task.dt, trace)
-        samples.append(task.data.qpos[task.model.jnt_qposadr[task.index.head_joints]].copy())
-    excursion = np.ptp(np.array(samples), axis=0)
-    assert np.linalg.norm(excursion[:2]) > .001
-    assert excursion[4] > .001
-    return dict(excursion_rad_or_m=excursion.tolist(), driver_force_limits=
-                task.model.actuator_forcerange[task.index.head_actuators].tolist())
-
-
-def viewer_session(robot):
-    from feedingrobot.sim.viewer import passive_viewer
+def viewer(robot, output):
     task = FeedingTask(robot)
-    task.reset(preset="food_on_spoon")
-    with passive_viewer(task.model, task.data) as viewer:
-        viewer.opt.geomgroup[3] = 0
-        for _ in range(100):
-            task.step_physics()
-            viewer.sync()
-            time.sleep(.005)
-        assert viewer.is_running(), "Viewer closed before verification"
+    results = {}
+    for preset in ('bowl_reset', 'pickup_supported'):
+        folder = output/'viewer'/preset
+        folder.mkdir(parents=True, exist_ok=True)
+        if preset == 'bowl_reset':
+            task.scene_config['head_fixed'] = True
+            task.reset(seed=0)
+            state = task.get_state()
+        else:
+            with (output/'baseline'/'sweep_seed_0_pickup.pkl').open('rb') as file:
+                state = pickle.load(file)
+            task.set_state(state)
+        with (folder/'snapshot.pkl').open('wb') as file:
+            pickle.dump(state,file)
+        results[preset] = b.visual_check(task,folder)
+    return dict(status='passed' if all(v['status']=='passed' for v in results.values()) else 'failed', views=results)
 
 
-def viewer_check(task, cfg, trace):
-    result = subprocess.run([sys.executable, "-c",
-        "from feedingrobot.scripts.validate_m1 import viewer_session; import sys; viewer_session(sys.argv[1])",
-        task.robot_id], cwd=ROOT, capture_output=True, text=True, timeout=30)
-    assert result.returncode == 0, result.stdout + result.stderr
-    return dict(open_sync_close=True, stderr=result.stderr)
+def source_manifest():
+    manifest = load_json('third_party_manifest.json')
+    rows = list(manifest['derived_files'])
+    for entry in manifest['sources']:
+        rows.extend(entry.get('files', []))
+    mismatches = [row['path'] for row in rows if hashlib.sha256((ROOT/row['path']).read_bytes()).hexdigest()!=row['sha256']]
+    assert not mismatches, f'Stale source manifest hashes: {mismatches}'
+    return dict(status='passed', checked_files=len(rows), parameter_status=load_json('configs/scene.json')['beans']['contact_parameter_status'])
 
 
-def convergence(robot, cfg, trace):
-    runs = []
-    for seed in cfg["seeds"]:
-        variants = []
-        baseline = load_json("configs/scene.json")["solver_iterations"]
-        for dt, iterations in [(.001, baseline), (.0005, baseline), (.001, 2 * baseline)]:
-            task = FeedingTask(robot, timestep=dt)
-            task.scene_config["head_fixed"] = True
-            task.model.opt.iterations = iterations
-            if iterations == 2 * baseline:
-                task.model.opt.tolerance /= 10
-            result = carry(task, cfg, [], seed)
-            result.update(dt=dt, iterations=iterations, seed=seed)
-            variants.append(result)
-        base = variants[0]
-        for other in variants[1:]:
-            pos = np.linalg.norm(np.array(base["tcp_position"]) - other["tcp_position"])
-            rotation = angle_error(np.array(base["tcp_rotation"]), np.array(other["tcp_rotation"]))
-            force = abs(base["peak_force_n"] - other["peak_force_n"])
-            impulse = abs(base["impulse_ns"] - other["impulse_ns"])
-            tolerance = max(cfg["convergence_force_absolute_n"], cfg["convergence_force_relative"] * base["peak_force_n"])
-            assert pos <= cfg["convergence_position_m"], pos
-            assert rotation <= cfg["convergence_rotation_rad"], rotation
-            assert force <= tolerance, (force, tolerance)
-            assert impulse <= max(cfg["convergence_impulse_absolute_ns"], cfg["convergence_impulse_relative"] * base["impulse_ns"])
-        runs.extend(variants)
-    return dict(runs=runs)
+def validate(robot, output, selected=None, expected_hashes=None):
+    output.mkdir(parents=True, exist_ok=True)
+    chosen = set(REQUIRED if selected is None else selected)
+    if chosen - set(REQUIRED):
+        raise ValueError(f'Unknown cases: {chosen-set(REQUIRED)}')
+    start_hashes = input_hashes()
+    report = dict(schema_version=1, snapshot_schema_version=3, model_version='single_bean_native_v1', stage='M1-D',
+                  scope='Single-bean feeding prototype M1; fixed layout; M3/M4 not verified',
+                  robot_id=robot, status='incomplete', m1_status='incomplete',
+                  stages={stage:'not_verified' for stage in ('M1-A','M1-B','M1-C','M1-D','M3','M4')},
+                  input_hashes=start_hashes, numerical_settings=SETTINGS,
+                  cases={name:dict(status='not_verified') for name in REQUIRED})
+    path = output/'m1d_report.json'
+    def run(name, check):
+        started=time.monotonic()
+        try:
+            report['cases'][name]=check()
+        except Exception:
+            report['cases'][name]=dict(status='failed',error=traceback.format_exc())
+        report['cases'][name]['wall_s']=time.monotonic()-started
+        write_json(path,report)
+        print(robot,name,report['cases'][name]['status'],flush=True)
+    if 'assembly' in chosen:
+        run('assembly',lambda: a.validate(robot))
+        report['stages']['M1-A']=report['cases']['assembly']['status']
+    if 'contacts' in chosen:
+        run('contacts',lambda: b.validate(robot,output/'contacts',numerical=True))
+        report['stages']['M1-B']=report['cases']['contacts']['status']
+    controls = chosen & set(CONTROL_CASES)
+    baseline = None
+    baseline_cases = set(controls)
+    if 'convergence' in chosen:
+        baseline_cases.update(MOTION_CASES)
+    if 'viewer' in chosen:
+        baseline_cases.add('sweep_seed_0')
+    if 'performance' in chosen:
+        baseline_cases.update(CONTROL_CASES)
+    if baseline_cases:
+        baseline = c.validate(robot,output/'baseline',sorted(baseline_cases))
+        for name in controls:
+            report['cases'][name]=copy.deepcopy(baseline['cases'][name])
+            for field in ('state_file', 'trajectory_file'):
+                if field in report['cases'][name]:
+                    report['cases'][name][field]=str(output/'baseline'/report['cases'][name][field])
+        if controls == set(CONTROL_CASES):
+            report['stages']['M1-C']=baseline['stages']['M1-C']
+        elif any(report['cases'][n]['status']=='failed' for n in controls):
+            report['stages']['M1-C']='failed'
+        write_json(path,report)
+    if 'convergence' in chosen:
+        run('convergence',lambda: convergence(robot,output,baseline))
+    if 'viewer' in chosen:
+        run('viewer',lambda: viewer(robot,output))
+    if 'performance' in chosen:
+        def performance():
+            assert baseline and all(baseline['cases'][n]['status']=='passed' for n in CONTROL_CASES)
+            rows={n:{**baseline['cases'][n]['performance'], 'load_wall_s':baseline['cases'][n]['load_wall_s'],
+                     'model_load_wall_s':baseline['cases'][n]['model_load_wall_s']} for n in CONTROL_CASES}
+            return dict(status='passed', full_control_rtf_gate=False, cases=rows)
+        run('performance',performance)
+    if 'manifest' in chosen:
+        run('manifest',source_manifest)
+    end_hashes=input_hashes()
+    report['hashes_unchanged']=start_hashes==end_hashes and (expected_hashes is None or start_hashes==expected_hashes)
+    report['final_input_hashes']=end_hashes
+    if not report['hashes_unchanged']:
+        report['cases']['manifest']=dict(status='failed',error='Input hash drift or different robot input version')
+    statuses=[v['status'] for v in report['cases'].values()]
+    report['status']='passed' if all(v=='passed' for v in statuses) else ('failed' if 'failed' in statuses else 'incomplete')
+    report['stages']['M1-D']=report['status']
+    report['m1_status']=report['status']
+    write_json(path,report)
+    return report
 
 
-def fault_checks(task, cfg, trace):
-    task.reset(preset="empty")
-    # Unreachable workspace request must clear and latch the reference.
-    base_p = task.data.site_xpos[task.index.base]
-    base_r = task.data.site_xmat[task.index.base].reshape(3, 3)
-    p = base_r.T @ (task.data.site_xpos[task.index.tcp] - base_p)
-    task.robot_config["workspace_max"] = (p + [.0001, 1, 1]).tolist()
-    now = task.data.time
-    task.adapter.set_twist([.05, 0, 0, 0, 0, 0], now, now + 1)
-    for _ in range(200):
-        task.step_physics()
-        if task.adapter.fault:
-            break
-    assert task.adapter.fault == "workspace_limit" and task.adapter.command is None
-    reference = task.data.ctrl[task.index.actuators].copy()
-    for _ in range(20):
-        task.step_physics()
-    np.testing.assert_array_equal(reference, task.data.ctrl[task.index.actuators])
-    return {"unreachable_cancelled": True}
+def publish_freeze(reports, folders, destination, expected_hashes):
+    assert set(reports)=={'panda','ur5e'}, 'Freeze requires both robots'
+    assert input_hashes()==expected_hashes, 'Input hash drift before publication'
+    beans = load_json('configs/scene.json')['beans']
+    assert beans['contact_parameter_status']=='frozen', 'Parameters are still candidate'
+    assert beans['count']==1, 'Freeze requires exactly one bean'
+    for robot, report in reports.items():
+        assert report['model_version']=='single_bean_native_v1' and report['snapshot_schema_version']==3
+        assert report['status']=='passed' and report['hashes_unchanged']
+        assert report['input_hashes']==expected_hashes==report['final_input_hashes']
+        assert all(report['cases'].get(n,{}).get('status')=='passed' for n in REQUIRED)
+        assert all(report['stages'][n]=='passed' for n in ('M1-A','M1-B','M1-C','M1-D'))
+        assert all(report['stages'].get(n)=='not_verified' for n in ('M3','M4'))
+    evidence={str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else str(p):hashlib.sha256(p.read_bytes()).hexdigest()
+              for folder in folders.values() for p in sorted(folder.rglob('*')) if p.is_file()}
+    versions={name:importlib.metadata.version(name) for name in ('mujoco','numpy','mink','qpsolvers','daqp')}
+    manifest=dict(schema_version=1, model_version='single_bean_native_v1',
+                  scope='Single-bean M1, fixed layout; no randomized-layout or full feeding release',status='frozen',input_sha256=expected_hashes,
+                  actual_parameters={r:dict(solver=reports[r]['cases']['assembly']['solver'],
+                      beans=reports[r]['cases']['contacts']['contact_parameters'],
+                      acceptance=load_json('configs/acceptance.json'),
+                      controls={n:reports[r]['cases'][n].get('actual_control_parameters', {}) for n in CONTROL_CASES}) for r in reports},
+                  environment=dict(python=sys.version,platform=platform.platform(),versions=versions),
+                  reports={r:str(folders[r]/'m1d_report.json') for r in reports},evidence_sha256=evidence,
+                  stages={'M1-A':'passed','M1-B':'passed','M1-C':'passed','M1-D':'passed','M3':'not_verified','M4':'not_verified'})
+    assert input_hashes()==expected_hashes, 'Input hash drift during receipt generation'
+    write_json(destination,manifest)
+    return manifest
 
 
-def guard_regressions(task, cfg, trace):
-    tests = ["tests/test_contracts.py", "tests/test_guard_physics.py", "tests/test_tableware.py"]
-    result = subprocess.run([sys.executable, "-m", "pytest", "-q", *tests], cwd=ROOT,
-                            capture_output=True, text=True, timeout=120)
-    assert result.returncode == 0, result.stdout + result.stderr
-    return dict(tests=tests, return_code=result.returncode, output=result.stdout)
+
+def parameter_status(status):
+    """Prepare a candidate/frozen input version before its next formal run."""
+    scene = load_json('configs/scene.json')
+    scene['beans']['contact_parameter_status'] = status
+    write_json(ROOT/'configs/scene.json', scene)
+    manifest = load_json('third_party_manifest.json')
+    for row in manifest['derived_files']:
+        row['sha256'] = hashlib.sha256((ROOT/row['path']).read_bytes()).hexdigest()
+    write_json(ROOT/'third_party_manifest.json', manifest)
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--robot", choices=["panda", "ur5e"], default="panda")
-    parser.add_argument("--cases", nargs="*")
-    parser.add_argument("--output")
-    args = parser.parse_args()
-    cfg = load_json("configs/acceptance.json")
-    cases = dict(assembly=assembly, head=dynamic_head, viewer=viewer_check, plate=plate, hold=holding, tracking=tracking, reset=reset_check, wrench=wrench_check, carry=carry,
-                 tilt=lambda t, c, tr: drop(t, c, tr, "tilt"),
-                 acceleration=lambda t, c, tr: drop(t, c, tr, "acceleration"),
-                 reachability=reachability, faults=fault_checks, guards=guard_regressions)
-    cases["convergence"] = lambda t, c, tr: convergence(args.robot, c, tr)
-    output = ROOT / (args.output or f"outputs/new_tableware/v2/m1/{args.robot}")
-    output.mkdir(parents=True, exist_ok=True)
-    inputs = asset_files(args.robot) + list((ROOT / "src/feedingrobot").rglob("*.py"))
-    inputs += [ROOT / name for name in ("tests/test_contracts.py", "tests/test_guard_physics.py", "tests/test_tableware.py",
-                                       "requirements.lock.txt", "third_party_manifest.json")]
-    report = {"robot_id": args.robot, "model_version": "new_tableware_v2", "acceptance": cfg,
-              "input_hashes": {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in inputs},
-              "cases": {}}
-    for name, check in cases.items():
-        if args.cases is not None and name not in args.cases:
-            report["cases"][name] = {"status": "not_verified"}
-            continue
-        trace = []
-        started = time.monotonic()
-        try:
-            task = FeedingTask(args.robot)
-            task.scene_config["head_fixed"] = name != "head"
-            task.reset()
-            detail = check(task, cfg, trace)
-            report["cases"][name] = {"status": "passed", "head_fixed": task.scene_config["head_fixed"], "metrics": detail}
-        except Exception:
-            report["cases"][name] = {"status": "failed", "error": traceback.format_exc()}
-        report["cases"][name]["wall_seconds"] = time.monotonic() - started
-        print(args.robot, name, report["cases"][name]["status"], flush=True)
-        if trace:
-            with (output / f"{name}.csv").open("w") as file:
-                writer = csv.DictWriter(file, fieldnames=trace[0].keys())
-                writer.writeheader()
-                writer.writerows(trace)
-        (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    report["status"] = "passed" if all(c["status"] == "passed" for c in report["cases"].values()) else "incomplete"
-    (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    if report["status"] != "passed":
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--robot',choices=['panda','ur5e','all'],default='panda')
+    parser.add_argument('--cases',nargs='+',choices=REQUIRED)
+    parser.add_argument('--output')
+    args=parser.parse_args()
+    robots=('panda','ur5e') if args.robot=='all' else (args.robot,)
+    output=ROOT/(args.output or 'outputs/single_bean/v1/m1')
+    folders={r:(output/r/'m1d' if args.robot=='all' else output if args.output else output/r/'m1d') for r in robots}
+    expected=input_hashes()
+    final_run = (args.robot=='all' and args.cases is None
+                 and load_json('configs/scene.json')['beans']['contact_parameter_status']=='frozen')
+    try:
+        reports={r:validate(r,folders[r],args.cases,expected) for r in robots}
+        passed=all(v['status']=='passed' for v in reports.values())
+        if final_run and passed:
+            publish_freeze(reports,folders,output/'freeze_manifest.json',expected)
+    except BaseException:
+        if final_run:
+            parameter_status('candidate')
+        raise
+    if not passed:
+        if final_run:
+            parameter_status('candidate')
         raise SystemExit(1)
 
 
-if __name__ == "__main__":
+if __name__=='__main__':
     main()

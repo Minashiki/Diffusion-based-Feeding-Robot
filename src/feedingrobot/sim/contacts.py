@@ -13,8 +13,13 @@ def read_contacts(model, data, index):
         force = contact.frame.reshape(3, 3).T @ wrench[:3]
         rows.append(dict(geom1=int(contact.geom1), geom2=int(contact.geom2),
                          group1=index.group(model, contact.geom1), group2=index.group(model, contact.geom2),
+                         bean1_id=index.bean_id_by_geom.get(int(contact.geom1)),
+                         bean2_id=index.bean_id_by_geom.get(int(contact.geom2)),
+                         condim=int(contact.dim), friction=contact.friction.copy(),
+                         solref=contact.solref.copy(), solimp=contact.solimp.copy(),
                          force_on_geom2_world=force.copy(), force_n=float(np.linalg.norm(force)),
-                         position=contact.pos.copy(), distance=float(contact.dist)))
+                         position=contact.pos.copy(), distance=float(contact.dist),
+                         includemargin=float(contact.includemargin)))
     return rows
 
 

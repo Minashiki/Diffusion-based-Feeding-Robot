@@ -36,5 +36,43 @@
   "support_drift_m": 0.003,
   "convergence_impulse_absolute_ns": 0.005,
   "convergence_impulse_relative": 0.2,
-  "reachability_timeout_s": 20.0
+  "reachability_timeout_s": 20.0,
+  "beans_native": {
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "max_settle_s": 5.0,
+    "stable_window_s": 0.5,
+    "linear_speed_m_s": 0.001,
+    "angular_speed_rad_s": 0.1,
+    "penetration_limit_m": 0.0004,
+    "spawn_gap_m": 0.0005,
+    "wall_budget_s": 60.0,
+    "support_min_force_n": 1e-05,
+    "m1c": {
+      "load_relative_error": 0.2,
+      "carry_duration_s": 1.0,
+      "pickup_window_s": 0.5,
+      "pickup_observation_s": 10.0,
+      "sweep_speed_m_s": 0.005,
+      "sweep_start_xy_m": [
+        -0.005,
+        0.012
+      ],
+      "entry_pitch_deg": 65.0,
+      "contact_clearance_m": 0.0005,
+      "pose_position_error_m": 0.0007,
+      "pose_orientation_error_rad": 0.01,
+      "entry_yaw_deg": 0.0
+    }
+  }
 }

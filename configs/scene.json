@@ -20,7 +20,6 @@
       0.15
     ]
   },
-  "food_mass_kg": 0.003,
   "model": "assets/task/scene.xml",
   "timestep": 0.001,
   "settle_seconds": 0.5,
@@ -28,23 +27,66 @@
   "wrist_force_limit_n": 8.0,
   "joint_speed_fault_rad_s": 2.0,
   "head_fixed": false,
-  "plate_asset": "assets/task/tableware/plate/plate.xml",
-  "plate_position": [
-    0.45,
-    -0.18,
-    -0.01879
-  ],
-  "plate_quaternion": [
-    0.999999921293,
-    -0.000286364022771,
-    -0.000272620422813,
-    3.29795052885e-05
-  ],
   "spoon_tcp_m": [
     0.04,
     0,
     -0.0062854
   ],
   "solver_iterations": 100,
-  "food_spawn_gap_m": 0.0005
+  "ccd_tolerance": 1e-12,
+  "bowl_asset": "assets/task/tableware/bowl/bowl.xml",
+  "bowl_frame_position_m": [
+    0.45,
+    -0.18,
+    -0.0156
+  ],
+  "beans": {
+    "count": 1,
+    "visual_mesh": "assets/task/foods/beans/meshes/bean_visual.obj",
+    "semi_axes_m": [
+      0.007,
+      0.0045,
+      0.004
+    ],
+    "density_kg_m3": 1000,
+    "friction": [
+      0.25,
+      0.0001,
+      0.0001
+    ],
+    "solref": [
+      0.002,
+      1
+    ],
+    "solimp": [
+      0.99,
+      0.999,
+      0.0002,
+      0.5,
+      2
+    ],
+    "condim": 6,
+    "priority": 2,
+    "margin": 5e-05,
+    "gap": 0,
+    "compile_ring_radius_m": 0.022,
+    "compile_layer_heights_m": [
+      0.0075,
+      0.022
+    ],
+    "contact_parameter_revision": 4,
+    "contact_parameter_status": "frozen",
+    "reset_position_bowl_m": [
+      0.01987645624922746,
+      0.012001153227614164,
+      0.0075
+    ],
+    "reset_quaternion_wxyz": [
+      -0.1723840605901834,
+      -0.24869534818743078,
+      0.8057862669099752,
+      0.5090607542363261
+    ],
+    "reset_pose_source": "profile65_single_matrix/baseline/states.pkl initial bean_011; fixed XY/quaternion, raised spawn Z; natural settling"
+  }
 }

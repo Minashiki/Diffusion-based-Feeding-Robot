@@ -17,7 +17,7 @@ def main():
     parser.add_argument("--seconds", type=float, default=4.)
     args = parser.parse_args()
     task = FeedingTask(args.robot)
-    task.reset(preset="food_on_spoon")
+    task.reset(preset="beans_on_spoon")
     if args.headless:
         context = nullcontext(None)
     else:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import time
 
 import mink
 import mujoco
@@ -15,125 +16,171 @@ from feedingrobot.sim.contacts import ContactMonitor, read_contacts
 from feedingrobot.sim.model import load_model, load_json, named_id
 from feedingrobot.sim.events import TaskEvents, evidence
 from feedingrobot.sim.sensors import wrist_state
+from feedingrobot.sim.beans import bean_state, bean_diagnostics, place_beans, spawn_clearance
 
 
 class FeedingTask:
     def __init__(self, robot_id="panda", timestep=None, *, task_mode=False):
+        if task_mode:
+            raise NotImplementedError("M3/M4 require the pending single-bean full feeding task migration")
+        started = time.perf_counter()
         self.model, self.index, self.robot_config, self.scene_config = load_model(robot_id, timestep)
+        self.model_load_wall_s = time.perf_counter() - started
         self.data = mujoco.MjData(self.model)
         self.dt = float(self.model.opt.timestep)
         self.robot_id = robot_id
         self.task_mode = task_mode
         self.task_config = load_json("configs/task.json")
+        self.bean_acceptance = load_json("configs/acceptance.json")["beans_native"]
         self.logic = None
         self.monitor = ContactMonitor(self.scene_config["contact_force_limit_n"])
         self.adapter = None
-        self.default_food_mass = float(self.model.body_mass[self.index.food_body])
-        self.default_food_inertia = self.model.body_inertia[self.index.food_body].copy()
-        self.food_geom = named_id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "food_box")
-        self.default_food_friction = self.model.geom_friction[self.food_geom].copy()
         self.default_jaw_range = self.model.jnt_range[self.index.head_joints[-1]].copy()
         self.head_body = named_id(self.model, mujoco.mjtObj.mjOBJ_BODY, "head")
         self.default_head_origin = self.model.body_pos[self.head_body].copy()
         self.reset()
         self.adapter = RobotAdapter(self.model, self.data, self.index, self.robot_config)
+        if self.terminated:
+            self.adapter.stop(self.failure_reason, fault=True)
         self.provider = StateProvider(self)
 
-    def reset(self, seed=0, preset="food_on_plate", *, scenario=None):
-        if preset not in {"food_on_plate", "food_on_spoon", "empty"}:
+    def reset(self, seed=0, preset="beans_in_bowl", *, scenario=None):
+        if preset not in {"beans_in_bowl", "beans_on_spoon", "empty"}:
             raise ValueError(f"Unknown reset preset: {preset}")
-        self.seed = int(seed)
-        rng = np.random.default_rng(seed)
         from feedingrobot.sim.scenarios import validate_scenario
         scenario = validate_scenario(scenario)
-        mass = scenario.get("food_mass_kg", self.default_food_mass)
-        self.model.body_mass[self.index.food_body] = mass
-        self.model.body_inertia[self.index.food_body] = self.default_food_inertia * mass / self.default_food_mass
-        self.model.geom_friction[self.food_geom] = self.default_food_friction
-        self.model.geom_friction[self.food_geom, 0] = scenario.get("food_friction", self.default_food_friction[0])
+        if set(scenario) & {"food_mass_kg", "food_friction", "food_offset_m", "recover"}:
+            raise ValueError("Single-food scenario parameters are not supported by native Beans")
+        self.seed = int(seed)
         self.model.jnt_range[self.index.head_joints[-1]] = self.default_jaw_range
         self.model.body_pos[self.head_body] = scenario.get("head_origin_m", self.default_head_origin)
-        if scenario.get("recover", False):
-            self.model.jnt_range[self.index.head_joints[-1], 0] = -.65
         mujoco.mj_setConst(self.model, self.data)
         mujoco.mj_resetData(self.model, self.data)
         self.tick = 0
+        self.physics_timing = dict(mj_step_s=0., forward_s=0., steps=0)
         self.terminated = False
         self.failure_reason = None
         self.external_wrench = None
         self.monitor.reset()
-        self.contacts = []
+        self.contacts, self.applied_contacts = [], []
         self.substep_contact_peak_n = self.substep_wrist_peak_n = 0.
         self.scenario_state = dict(seed=self.seed, head_phase=scenario.get("head_phase_rad", 0.),
-                                   future_events=[], parameters=scenario, closure_start=None)
-        self.logic = TaskEvents(self.task_config) if self.task_mode else None
+                                  future_events=[], parameters=scenario, closure_start=None)
+        self.logic = None
         self.data.qpos[self.index.qpos] = self.robot_config["reset_q"]
         self.data.ctrl[self.index.actuators] = self.robot_config["reset_q"]
-        # Configuration placement is permitted only during reset.
-        address = self.index.food_qpos
-        self.data.qpos[address:address + 7] = [2, 2, .1, 1, 0, 0, 0]
-        mujoco.mj_forward(self.model, self.data)
-        # Settle the robot under gravity before placing food on its actual spoon.
-        for _ in range(round(self.scene_config["settle_seconds"] / self.dt)):
-            self.step_physics(_settling=True)
-            if self.terminated:
-                raise RuntimeError(f"Reset settling failed: {self.failure_reason}")
-        if preset != "empty":
-            site = self.index.tcp if preset == "food_on_spoon" else named_id(
-                self.model, mujoco.mjtObj.mjOBJ_SITE, "plate_frame")
-            rotation = self.data.site_xmat[site].reshape(3, 3)
-            offset = (rng.uniform(-.001, .001, 2) if preset == "food_on_spoon"
-                      else scenario.get("food_offset_m", rng.uniform(-.01, .01, 2)))
-            xy = np.r_[offset, 0.]
-            geoms = self.index.scoop_geoms if preset == "food_on_spoon" else [named_id(
-                self.model, mujoco.mjtObj.mjOBJ_GEOM, "collision_plate_fast_base_disk")]
-            half = self.model.geom_size[self.food_geom]
-            heights = []
-            for x in (-half[0], 0., half[0]):
-                for y in (-half[1], 0., half[1]):
-                    point = self.data.site_xpos[site] + rotation @ (xy + [x, y, .05])
-                    distances = []
-                    for geom in geoms:
-                        if self.model.geom_type[geom] == mujoco.mjtGeom.mjGEOM_MESH:
-                            hit = mujoco.mj_rayMesh(self.model, self.data, geom, point, -rotation[:, 2])
-                        else:
-                            hit = mujoco.mju_rayGeom(self.data.geom_xpos[geom], self.data.geom_xmat[geom],
-                                self.model.geom_size[geom], point, -rotation[:, 2], self.model.geom_type[geom])
-                        if hit >= 0:
-                            distances.append(hit)
-                    if not distances:
-                        raise ValueError("Food footprint is outside the collision support surface")
-                    heights.append(.05 - min(distances))
-            xy[2] = max(heights) + half[2] + self.scene_config["food_spawn_gap_m"]
-            position = self.data.site_xpos[site] + rotation @ xy
-            quat = np.zeros(4)
-            mujoco.mju_mat2Quat(quat, rotation.ravel())
-        else:
-            position, quat = np.array([2., 2., .1]), np.array([1., 0, 0, 0])
-        self.data.qpos[address:address + 7] = np.r_[position, quat]
-        food_joint = self.model.body_jntadr[self.index.food_body]
-        food_dof = self.model.jnt_dofadr[food_joint]
-        self.data.qvel[food_dof:food_dof + 6] = 0
-        self.data.time = 0.
-        self.data.xfrc_applied[:] = 0
-        self.data.qfrc_applied[:] = 0
-        self.tick = 0
-        self.monitor.reset()
-        self.contacts = []
-        self.scenario_state["closure_start"] = None
-        self.scenario_state["future_events"] = []
-        self.substep_contact_peak_n = self.substep_wrist_peak_n = 0.
+        place_beans(self, "empty", self.seed)
         mujoco.mj_forward(self.model, self.data)
         if self.adapter:
             self.adapter.reset()
+        started = time.monotonic()
+        for _ in range(round(self.scene_config["settle_seconds"] / self.dt)):
+            self.step_physics(_settling=True)
+            if self.terminated:
+                raise RuntimeError(f"Robot reset settling failed: {self.failure_reason}")
+        robot_wall = time.monotonic() - started
+        robot_timing = dict(self.physics_timing)
+        self.physics_timing = dict(mj_step_s=0., forward_s=0., steps=0)
+        place_beans(self, preset, self.seed)
+        mujoco.mj_forward(self.model, self.data)
+        self.contacts = read_contacts(self.model, self.data, self.index)
+        self.applied_contacts = []
+        clearance = spawn_clearance(self, preset)
+        cfg = self.bean_acceptance
+        self.reset_diagnostics = dict(preset=preset, seed=self.seed, status="passed",
+                                      spawn_clearance_m=clearance, robot_settle_wall_s=robot_wall,
+                                      robot_performance=robot_timing)
+        if clearance < cfg["spawn_gap_m"] - 1e-9:
+            raise ValueError(f"Bean spawn clearance {clearance} is below required gap")
+        if preset != "empty":
+            self._settle_beans(preset)
+        self.data.time = 0.
+        self.tick = 0
+        self.data.xfrc_applied[:] = 0
+        self.data.qfrc_applied[:] = 0
+        self.monitor.reset()
+        self.contacts = read_contacts(self.model, self.data, self.index)
+        self.applied_contacts = []
+        self.substep_contact_peak_n = self.substep_wrist_peak_n = 0.
+        if self.adapter:
+            self.adapter.reset()
+            if self.terminated:
+                self.adapter.stop(self.failure_reason, fault=True)
         return self.snapshot()
+
+    def _settle_beans(self, preset):
+        cfg = self.bean_acceptance
+        window = best = maximum = low_window = best_low = 0.
+        peak = None
+        started = time.monotonic()
+        initial = self.data.qpos.copy()
+        state_kind = mujoco.mjtState.mjSTATE_INTEGRATION
+        initial_physics = np.empty(mujoco.mj_stateSize(self.model, state_kind))
+        mujoco.mj_getState(self.model, self.data, initial_physics, state_kind)
+        trace = [dict(time_s=0., **bean_state(self.model, self.data, self.index))]
+        violations = []
+        trace_stride = round(.01 / self.dt)
+        contact_evidence = {}
+        violating_ids = set()
+        for step in range(round(cfg["max_settle_s"] / self.dt)):
+            self.step_physics(_settling=True)
+            diag = bean_diagnostics(self)
+            for row in self.applied_contacts + self.contacts:
+                if row.get("bean1_id") or row.get("bean2_id"):
+                    key = (row["geom1"], row["geom2"])
+                    if key not in contact_evidence or row["force_n"] > contact_evidence[key]["force_n"]:
+                        contact_evidence[key] = dict(time_s=(step + 1) * self.dt, **row)
+            if diag["max_penetration_m"] > maximum:
+                maximum = diag["max_penetration_m"]
+                peak = dict(diag["penetration_peak"],
+                            time_s=(step + (0 if diag["penetration_peak"]["source"] == "applied_contact" else 1)) * self.dt)
+            violating_ids.update(diag["penetration_ids"])
+            supported = diag["bowl_supported"].copy()
+            if preset == "beans_on_spoon":
+                supported[0] = diag["spoon_supported"][0]
+            inside = diag["in_bowl"].copy()
+            if preset == "beans_on_spoon":
+                inside[0] = True
+            low = (diag["linear_speed_m_s"] < cfg["linear_speed_m_s"]) & (diag["angular_speed_rad_s"] < cfg["angular_speed_rad_s"])
+            low_window = low_window + self.dt if low.all() else 0.
+            best_low = max(best_low, low_window)
+            window = window + self.dt if low.all() and supported.all() and inside.all() else 0.
+            best = max(best, window)
+            if diag["max_penetration_m"] > cfg["penetration_limit_m"] and not any(v["reason"] == "penetration" for v in violations):
+                violations.append(dict(time_s=(step + 1) * self.dt, reason="penetration", bean_ids=diag["penetration_ids"]))
+            violating_ids.update(np.array(self.index.bean_ids)[~inside].tolist())
+            if not inside.all() and not any(v["reason"] == "outside_bowl" for v in violations):
+                violations.append(dict(time_s=(step + 1) * self.dt, reason="outside_bowl", bean_ids=np.array(self.index.bean_ids)[~inside].tolist(),
+                                       boundary_violations=[v for v in diag["boundary_violations"] if v["bean_id"] in np.array(self.index.bean_ids)[~inside]]))
+            if (step + 1) % trace_stride == 0:
+                trace.append(dict(time_s=(step + 1) * self.dt, **bean_state(self.model, self.data, self.index)))
+            if self.terminated or any(w.number for w in self.data.warning) or time.monotonic() - started > cfg["wall_budget_s"]:
+                break
+            if window + 1e-12 >= cfg["stable_window_s"]:
+                break
+        passed = (window + 1e-12 >= cfg["stable_window_s"] and not violations and not self.terminated
+                  and not any(w.number for w in self.data.warning) and time.monotonic() - started <= cfg["wall_budget_s"])
+        self.physics_timing["pure_physics_rtf"] = ((step + 1) * self.dt / self.physics_timing["mj_step_s"])
+        self.physics_timing["headless_reset_rtf"] = ((step + 1) * self.dt / (time.monotonic() - started))
+        self.physics_timing["ik_wall_s"] = 0.
+        final_physics = np.empty_like(initial_physics)
+        mujoco.mj_getState(self.model, self.data, final_physics, state_kind)
+        self.reset_diagnostics.update(state_spec="mjSTATE_INTEGRATION", initial_physics_state=initial_physics,
+            final_physics_state=final_physics, performance=dict(self.physics_timing), status="passed" if passed else "failed", stable_window_s=best,
+            bean_settle_s=(step + 1) * self.dt, bean_settle_wall_s=time.monotonic() - started,
+            max_penetration_m=maximum, penetration_peak=peak, low_speed_window_s=best_low,
+            violations=violations, initial_qpos=initial, failure_ids=sorted(violating_ids | set(np.array(self.index.bean_ids)[~(low & supported & inside)].tolist())),
+            final=diag, trajectory=trace, contact_evidence=list(contact_evidence.values()), warning_counts=[w.number for w in self.data.warning])
+        if not passed:
+            self.terminated = True
+            self.failure_reason = self.failure_reason or "bean_reset_settling_failed"
 
     def state_signature(self):
         buffer = np.empty(mujoco.mj_sizeModel(self.model), dtype=np.uint8)
         mujoco.mj_saveModel(self.model, None, buffer)
         digest = hashlib.sha256(buffer.tobytes())
-        digest.update(json.dumps([self.robot_config, self.scene_config, self.task_config], sort_keys=True).encode())
-        return dict(schema_version=2, event_rules_version=2, robot_id=self.robot_id, task_mode=self.task_mode,
+        digest.update(json.dumps([self.robot_config, self.scene_config, self.task_config, self.bean_acceptance], sort_keys=True).encode())
+        return dict(schema_version=3, event_rules_version=2, robot_id=self.robot_id, task_mode=self.task_mode,
                     model_config_hash=digest.hexdigest(), mujoco_version=mujoco.__version__)
 
     def get_state(self):
@@ -150,7 +197,7 @@ class FeedingTask:
                     warnings=[(w.lastinfo, w.number) for w in self.data.warning],
                     task=copy.deepcopy({key: getattr(self, key) for key in
                                        ("seed", "tick", "terminated", "failure_reason", "external_wrench",
-                                        "contacts", "scenario_state", "substep_contact_peak_n", "substep_wrist_peak_n")}),
+                                        "contacts", "applied_contacts", "reset_diagnostics", "physics_timing", "scenario_state", "substep_contact_peak_n", "substep_wrist_peak_n")}),
                     monitor=copy.deepcopy(vars(self.monitor)),
                     logic=copy.deepcopy(vars(self.logic)) if self.logic else None)
 
@@ -241,21 +288,29 @@ class FeedingTask:
             self._terminate("nonfinite_state")
             return {"terminated": True, "failure_reason": self.failure_reason}
         if self.adapter and not _settling:
+            started = time.perf_counter()
             self.adapter.update(self.dt)
+            self.physics_timing['ik_wall_s'] = self.physics_timing.get('ik_wall_s', 0.) + time.perf_counter() - started
             if self.task_mode and self.adapter.fault:
                 self._terminate(self.adapter.fault)
                 self.logic.update(evidence(self), 0., self.data.time, failure=self.failure_reason)
                 return self.snapshot()
         self._write_drivers()
+        started = time.perf_counter()
         mujoco.mj_step(self.model, self.data)
+        self.physics_timing["mj_step_s"] += time.perf_counter() - started
+        self.physics_timing["steps"] += 1
         self.tick += 1
         # These are the loads actually used by the integrator. Sampling only
         # after mj_forward could miss a short contact that has already separated.
         applied_contacts = read_contacts(self.model, self.data, self.index)
+        self.applied_contacts = applied_contacts
         overloaded = self.monitor.update(applied_contacts, self.dt, float(self.data.time))
         self.substep_contact_peak_n = self.monitor.last_peak_n
         applied_wrist = wrist_state(self.model, self.data, self.index)
+        started = time.perf_counter()
         mujoco.mj_forward(self.model, self.data)
+        self.physics_timing["forward_s"] += time.perf_counter() - started
         if (not all(np.isfinite(a).all() for a in [self.data.qpos, self.data.qvel, self.data.qacc])
                 or any(self.data.warning[w].number for w in [mujoco.mjtWarning.mjWARN_BADQPOS,
                                                             mujoco.mjtWarning.mjWARN_BADQVEL,
@@ -295,7 +350,7 @@ class FeedingTask:
                     tcp_position=self.data.site_xpos[idx.tcp].copy(),
                     tcp_rotation=self.data.site_xmat[idx.tcp].reshape(3, 3).copy(),
                     tcp_twist_world=np.r_[velocity[3:], velocity[:3]],
-                    food_position=self.data.xpos[idx.food_body].copy(),
+                    **bean_state(self.model, self.data, idx),
                     execution_status=self.adapter.status if self.adapter else "resetting",
                     terminated=self.terminated, failure_reason=self.failure_reason,
                     contact_peak_n=self.monitor.peak_n, contact_impulse_ns=self.monitor.impulse_ns,
@@ -316,7 +371,7 @@ class StateProvider:
         policy_keys = ["robot_id", "time", "q", "dq", "tcp_position", "tcp_rotation", "tcp_twist_world",
                        "raw_wrench_sensor", "wrench_world_at_tcp", "compensated_wrench", "execution_status"]
         obs = {k: state[k] for k in policy_keys}
-        obs.update(food_relative_world=state["food_position"] - tcp,
+        obs.update(bean_relative_world=state["bean_positions"] - tcp,
                    mouth_relative_world=task.data.site_xpos[mouth].copy() - tcp,
                    frame_age_s=0., stage="m1_diagnostic",
                    current_tool_contact=any("spoon" in [r["group1"], r["group2"]] for r in task.contacts))
@@ -326,7 +381,11 @@ class StateProvider:
                        interaction=np.array([e[k] for k in ("supported", "mouth_supported", "tool_mouth_contact", "ready")],
                                             dtype=np.float32))
         return dict(policy_obs=obs,
-                    oracle_info=dict(contacts=copy.deepcopy(task.contacts), terminated=task.terminated,
+                    oracle_info=dict(contacts=copy.deepcopy(task.contacts),
+                                     bean_ids=list(task.index.bean_ids),
+                                     bean_masses_kg=task.model.body_mass[task.index.bean_bodies].copy(),
+                                     beans=bean_diagnostics(task, spoon_frame=True),
+                                     reset=copy.deepcopy(task.reset_diagnostics), terminated=task.terminated,
                                      failure_reason=task.failure_reason, contact_peak_n=task.monitor.peak_n,
                                      contact_impulse_ns=task.monitor.impulse_ns,
                                      contact_over_limit_s=task.monitor.over_limit_s,

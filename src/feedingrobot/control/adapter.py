@@ -22,7 +22,7 @@ class RobotAdapter:
         # Self collision and robot/environment avoidance. Task contact by the spoon is allowed.
         by_body = [[g for g in index.arm_geoms if model.geom_bodyid[g] == b] for b in sorted(index.arm_bodies)]
         pairs = [(a, b) for a, b in itertools.combinations(by_body, 2) if a and b]
-        obstacles = [g for g in range(model.ngeom) if index.group(model, g) in {"table", "plate", "mouth", "floor"}]
+        obstacles = [g for g in range(model.ngeom) if index.group(model, g) in {"table", "bowl", "mouth", "floor"}]
         pairs.append((index.arm_geoms, obstacles))
         self.limits = [mink.ConfigurationLimit(model),
                        mink.VelocityLimit(model, {n: config["joint_velocity_limit"] for n in config["joints"]}),

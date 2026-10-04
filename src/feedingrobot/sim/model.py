@@ -1,4 +1,4 @@
-"""Compose a configured robot, rigid tool and the shared P0 scene."""
+"""Compose a configured robot, rigid tool, fixed bowl and native Beans."""
 
 from __future__ import annotations
 
@@ -25,11 +25,14 @@ def named_id(model, kind, name):
 
 
 def asset_files(robot_id=None):
-    """Runtime inputs, including mesh bytes; the inactive bowl is excluded."""
+    """Runtime inputs, including mesh bytes; the inactive plate is excluded."""
     paths = set((ROOT / "configs").glob("*.json"))
+    scene_cfg = load_json("configs/scene.json")
+    tableware_paths = {ROOT / scene_cfg["bowl_asset"]}
     robots = [robot_id] if robot_id else ["panda", "ur5e"]
     for robot in robots:
         cfg = load_json(f"configs/robots/{robot}.json")
+        tableware_paths.add(ROOT / cfg["tool_asset"])
         paths.add(ROOT / f"configs/robots/{robot}.json")
         path = ROOT / cfg["model"]
         paths.add(path)
@@ -37,11 +40,11 @@ def asset_files(robot_id=None):
         compiler = xml.find("compiler")
         meshdir = path.parent / compiler.get("meshdir", ".")
         paths.update((meshdir / mesh.get("file")).resolve() for mesh in xml.findall("asset/mesh"))
-    paths.add(ROOT / load_json("configs/scene.json")["model"])
+    paths.add(ROOT / scene_cfg["model"])
+    paths.add(ROOT / scene_cfg["beans"]["visual_mesh"])
     tableware = ROOT / "assets/task/tableware"
     paths.add(tableware / "contact_pairs.xml")
-    for kind in ("spoon", "plate"):
-        path = tableware / kind / f"{kind}.xml"
+    for path in sorted(tableware_paths):
         paths.add(path)
         paths.update((path.parent / mesh.get("file")).resolve()
                      for mesh in ET.parse(path).findall("asset/mesh"))
@@ -89,7 +92,7 @@ def load_model(robot_id="panda", timestep=None):
     cfg = load_json(f"configs/robots/{robot_id}.json")
     scene_cfg = load_json("configs/scene.json")
     root = ET.parse(ROOT / scene_cfg["model"]).getroot()
-    ET.SubElement(root, "compiler", angle="radian", autolimits="true")
+    ET.SubElement(root, "compiler", angle="radian", autolimits="true", inertiafromgeom="auto")
     world = root.find("worldbody")
     base = ET.SubElement(world, "body", name="robot_base", pos=_numbers(cfg["base_position"]),
                          quat=_numbers(cfg["base_quaternion"]))
@@ -107,16 +110,53 @@ def load_model(robot_id="panda", timestep=None):
     tool.append(spoon)
     ET.SubElement(spoon, "site", name=cfg["tcp_site"], pos=_numbers(scene_cfg["spoon_tcp_m"]),
                   size="0.002", rgba="0 1 0 1")
-    plate = _merge_asset(root, ROOT / scene_cfg["plate_asset"], "new_plate")[0]
-    plate.remove(plate.find("freejoint"))
-    plate.set("pos", _numbers(scene_cfg["plate_position"]))
-    plate.set("quat", _numbers(scene_cfg["plate_quaternion"]))
-    internal = plate.find("body")
-    disk = internal.find("geom[@name='collision_plate_fast_base_disk']")
+    bowl = _merge_asset(root, ROOT / scene_cfg["bowl_asset"], "new_bowl")[0]
+    bowl.remove(bowl.find("freejoint"))
+    internal = bowl.find("body")
+    disk = internal.find("geom[@name='collision_bowl_fast_bottom_disk']")
     surface = np.fromstring(disk.get("pos"), sep=" ")
     surface[2] += float(disk.get("size").split()[1])
-    ET.SubElement(internal, "site", name="plate_frame", pos=_numbers(surface), size="0.002")
-    world.append(plate)
+    # Cancel the source internal rotation without changing its geometry.
+    quat = np.fromstring(internal.get("quat"), sep=" ")
+    quat /= np.linalg.norm(quat)
+    quat[1:] *= -1
+    rotation = np.zeros(9)
+    mujoco.mju_quat2Mat(rotation, quat)
+    origin = np.array(scene_cfg["bowl_frame_position_m"])
+    position = origin - rotation.reshape(3, 3) @ np.fromstring(internal.get("pos"), sep=" ") - surface
+    bowl.set("pos", _numbers(position))
+    bowl.set("quat", _numbers(quat))
+    ET.SubElement(internal, "site", name="bowl_frame", pos=_numbers(surface), size="0.002")
+    world.append(bowl)
+    beans = scene_cfg["beans"]
+    ET.SubElement(root.find("asset"), "mesh", name="bean_visual_mesh",
+                  file=str((ROOT / beans["visual_mesh"]).resolve()))
+    a, b, c = beans["semi_axes_m"]
+    mass = beans["density_kg_m3"] * 4 * np.pi * a * b * c / 3
+    inertia = mass / 5 * np.array([b*b + c*c, a*a + c*c, a*a + b*b])
+    # Episode placement and natural settling belong to reset.
+    for i in range(beans["count"]):
+        layer = int(i >= 8)
+        angle = 2 * np.pi * (i if layer == 0 else i - 8) / (8 if layer == 0 else 7)
+        radius = beans["compile_ring_radius_m"]
+        position = origin + [radius * np.cos(angle), radius * np.sin(angle),
+                             beans["compile_layer_heights_m"][layer]]
+        if beans["count"] == 1:
+            position = origin + beans["reset_position_bowl_m"]
+        name = f"bean_{i:03d}"
+        body = ET.SubElement(world, "body", name=name, pos=_numbers(position))
+        ET.SubElement(body, "freejoint", name=f"{name}_joint")
+        ET.SubElement(body, "inertial", pos="0 0 0", quat="1 0 0 0",
+                      mass=str(mass), diaginertia=_numbers(inertia))
+        ET.SubElement(body, "geom", name=f"{name}_visual", type="mesh", mesh="bean_visual_mesh",
+                      pos="0 0 0", quat="1 0 0 0", group="1", contype="0", conaffinity="0",
+                      density="0", rgba="0.45 0.18 0.07 1")
+        collision = dict(name=f"{name}_collision", type="ellipsoid", size=_numbers([a, b, c]),
+                         pos="0 0 0", quat="1 0 0 0", group="3", contype="2", conaffinity="3",
+                         density="0", rgba="0 0.55 1 0.25")
+        collision.update({key: _numbers(beans[key]) for key in ("friction", "solref", "solimp")})
+        collision.update({key: str(beans[key]) for key in ("condim", "priority", "margin", "gap")})
+        ET.SubElement(body, "geom", collision)
     sensor = root.find("sensor")
     if sensor is None:
         sensor = ET.SubElement(root, "sensor")
@@ -131,10 +171,11 @@ def load_model(robot_id="panda", timestep=None):
         if pair.get("geom1") in names and pair.get("geom2") in names:
             contact.append(copy.deepcopy(pair))
     if len(contact.findall("pair")) != 145:
-        raise ValueError("Expected all 145 source spoon/plate pairs")
+        raise ValueError("Expected all 145 source spoon/bowl pairs")
     ET.SubElement(contact, "exclude", body1=cfg["mount_body"], body2="dynamic_spoon2")
     root.find("option").set("timestep", str(timestep if timestep is not None else scene_cfg["timestep"]))
     root.find("option").set("iterations", str(scene_cfg["solver_iterations"]))
+    root.find("option").set("ccd_tolerance", str(scene_cfg["ccd_tolerance"]))
     model = mujoco.MjModel.from_xml_string(ET.tostring(root, encoding="unicode"))
     index = RobotIndex(model, cfg)
     scale = cfg.get("servo_gain_scale", 1.)
@@ -173,8 +214,16 @@ class RobotIndex:
         self.ft = sid(config["ft_site"])
         self.base = sid("robot_base_frame")
         self.tool_body = bid(config["tool_body"])
-        self.food_body = bid("food")
-        self.food_qpos = int(model.jnt_qposadr[jid("food_joint")])
+        gid = lambda n: named_id(model, mujoco.mjtObj.mjOBJ_GEOM, n)
+        bean_count = int(np.count_nonzero(model.jnt_type == mujoco.mjtJoint.mjJNT_FREE))
+        self.bean_ids = tuple(f"bean_{i:03d}" for i in range(bean_count))
+        self.bean_bodies = np.array([bid(n) for n in self.bean_ids])
+        self.bean_joints = np.array([jid(f"{n}_joint") for n in self.bean_ids])
+        self.bean_qpos = model.jnt_qposadr[self.bean_joints, None] + np.arange(7)
+        self.bean_dofs = model.jnt_dofadr[self.bean_joints, None] + np.arange(6)
+        self.bean_visual_geoms = np.array([gid(f"{n}_visual") for n in self.bean_ids])
+        self.bean_collision_geoms = np.array([gid(f"{n}_collision") for n in self.bean_ids])
+        self.bean_id_by_geom = dict(zip(self.bean_collision_geoms, self.bean_ids))
         self.sensors = [named_id(model, mujoco.mjtObj.mjOBJ_SENSOR, n) for n in config["ft_sensors"]]
         if any(model.sensor_dim[s] != 3 for s in self.sensors):
             raise ValueError("Wrist F/T sensors must each have dimension 3")
@@ -191,8 +240,8 @@ class RobotIndex:
         scoop = bid("spoon_scoop_part")
         self.scoop_geoms = [g for g in self.spoon_geoms if model.geom_bodyid[g] == scoop]
         self.handle_geoms = [g for g in self.spoon_geoms if g not in self.scoop_geoms]
-        self.plate_geoms = [g for g in range(model.ngeom)
-                            if (mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, g) or "").startswith("collision_plate_")]
+        self.bowl_geoms = [g for g in range(model.ngeom)
+                           if (mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, g) or "").startswith("collision_bowl_")]
         self.tool_mass = float(model.body_mass[list(self.tool_bodies)].sum())
         self.head_joints = np.array([jid(n) for n in ["head_x", "head_y", "head_z", "head_yaw", "jaw"]])
         self.head_actuators = np.array([named_id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, n)
@@ -204,11 +253,13 @@ class RobotIndex:
             return "arm"
         if geom in self.spoon_geoms:
             return "spoon"
-        if geom in self.plate_geoms:
-            return "plate"
+        if geom in self.bowl_geoms:
+            return "bowl"
+        if geom in self.bean_id_by_geom:
+            return "food"
         name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, geom) or ""
-        for group, prefixes in [("food", ("food",)), ("mouth", ("mouth", "jaw")),
-                                ("plate", ("plate",)), ("table", ("table",)), ("floor", ("floor",))]:
+        for group, prefixes in [("mouth", ("mouth", "jaw")),
+                                ("table", ("table",)), ("floor", ("floor",))]:
             if name.startswith(prefixes):
                 return group
         return "other"

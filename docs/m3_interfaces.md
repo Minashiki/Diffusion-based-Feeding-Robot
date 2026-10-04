@@ -1,3 +1,9 @@
+# 当前单豆喂餐原型范围
+
+单豆 M3 尚未迁移，`task_mode=True` 当前显式拒绝。后续必须从碗中自然初态验证舀取、携带、移到嘴前、释放、撤离、留存及掉落／失败；阶段预置诊断不替代完整流程。
+
+下文接口和成绩属于历史盘子／单块食物版本，不作为单豆放行依据。
+
 # M3 环境、state schema、phase schema 与 reward specification
 
 M3 使用 M1 的同一物理入口和保护阈值。默认 `FeedingTask(robot_id)` 仍是 M1 诊断；`FeedingTask(robot_id, task_mode=True)` 开启 M3 事件，`FeedingGymEnv` 在其上实现奖励与 50 Hz 交互。M2 已取消。这里定义的是 P0 刚体仿真任务，不是人体安全标准或已训练的喂餐策略。

@@ -404,14 +404,27 @@
       "notice_path": "docs/licenses/ebim-benchmark/NOTICE",
       "license_verification_commit": "161db49e9eafd34be31e5bdada72d8e2f796c16a",
       "license_status": "Source identified by the user. Task 3 README and NOTICE record contribution by Ahmed Shokry under Apache-2.0 with the author's agreement. Actual asset extraction commit remains unverified; license_verification_commit is only the version of the saved licensing evidence.",
-      "license_files": [{"path": "docs/licenses/ebim-benchmark/LICENSE", "sha256": "ab2cd053f20ef36b0aefbd7af45cd31c96f314d586c717f62791d6f636014026"}, {"path": "docs/licenses/ebim-benchmark/NOTICE", "sha256": "2c08fc3d938d6d623897deaf4fc421791e04a002c5ddbc6ff2574ecfb1a9dcf1"}, {"path": "docs/licenses/ebim-benchmark/task3_mujoco_README.md", "sha256": "62253b733221f2df5c3231bb57b2d219e619ff4a622e3c18db016c55a446e88c"}],
+      "license_files": [
+        {
+          "path": "docs/licenses/ebim-benchmark/LICENSE",
+          "sha256": "ab2cd053f20ef36b0aefbd7af45cd31c96f314d586c717f62791d6f636014026"
+        },
+        {
+          "path": "docs/licenses/ebim-benchmark/NOTICE",
+          "sha256": "2c08fc3d938d6d623897deaf4fc421791e04a002c5ddbc6ff2574ecfb1a9dcf1"
+        },
+        {
+          "path": "docs/licenses/ebim-benchmark/task3_mujoco_README.md",
+          "sha256": "62253b733221f2df5c3231bb57b2d219e619ff4a622e3c18db016c55a446e88c"
+        }
+      ],
       "runtime_root": "assets/task/tableware",
       "active_assets": [
         "spoon",
-        "plate"
+        "bowl"
       ],
       "inactive_assets": [
-        "bowl"
+        "plate"
       ],
       "files": [
         {
@@ -1019,7 +1032,7 @@
           "sha256": "60bff07be7a97b57083509c284b015f1544d5923242a20bb9687fbdd7a78ebf5"
         }
       ],
-      "modifications": "Source XML/OBJ bytes retained. Assembly removes free joints, scopes defaults/materials, resolves meshes and filters 145 spoon/plate pairs. Rigid transforms and sites are defined by model.py and scene/robot configurations. Runtime never reads extract."
+      "modifications": "Source XML/OBJ bytes retained. Assembly removes free joints, scopes defaults/materials, resolves meshes and filters 145 spoon/bowl pairs (plate retained as inactive source asset). Rigid transforms and sites are defined by model.py and scene/robot configurations. Runtime never reads extract."
     }
   ],
   "note": "Only runtime assets and selected M1 sensor logic are reused. Old M2 code and reports are not runtime dependencies.",
@@ -1034,11 +1047,11 @@
     },
     {
       "path": "assets/task/scene.xml",
-      "sha256": "fabd429020a824c49a0f853de05d6c21c15d371fd6957b99c65ee4f737c16c85"
+      "sha256": "e4444efefa78e7a04a24c3f50b2760e6e3565bf4dd7cdf8801b682efad4f27d4"
     },
     {
       "path": "configs/scene.json",
-      "sha256": "cc06004d0c74d541936d944656573e81ff6a4619161aade687832dfdb79a42af"
+      "sha256": "551e5df49fb2ce16d3507a339b8c899e4cdb5e56135ffab6f1855f8cec4c7055"
     },
     {
       "path": "configs/task.json",
@@ -1046,15 +1059,21 @@
     },
     {
       "path": "configs/acceptance.json",
-      "sha256": "2d47062fb67b71c770748bbbaebcdb23a05265909b0a2d82037ed109f737c438"
+      "sha256": "ed328ff1089784218197979072197b91e31246e321e90fa289ad36efa839ed02"
     },
     {
       "path": "configs/robots/panda.json",
-      "sha256": "f1f81cb68f8250fdd2e0c4bc7f1bee7a06d8d7f8cf588731cd4c64cc73d8c115"
+      "sha256": "c5f739fc23aa2b301a80fb165ba8e4a6d3dd07685e23e578982956266d16dfd8"
     },
     {
       "path": "configs/robots/ur5e.json",
-      "sha256": "31f44d7efde295cf4b1fc676e2377a923d0cde6588e8b647806f353a24acb9dd"
+      "sha256": "111d10bba9c2494fbb8d205e5216743126849907cbd6a0e70277ef6a409b37bd"
+    },
+    {
+      "path": "assets/task/foods/beans/meshes/bean_visual.obj",
+      "sha256": "ce60335c4b017386cc6f91b182d96db69c355a014907877efd7e4909842a1e29",
+      "origin": "project_generated",
+      "description": "Analytic metre-scale ellipsoid: semi-axes 0.007/0.0045/0.004 m, 16 latitude and 32 longitude segments, 482 vertices, 960 outward triangles, analytic smooth normals; no third-party mesh or SDF dependency."
     }
   ],
   "python_dependencies": {
