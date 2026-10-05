@@ -2,7 +2,7 @@
 
 固定碗、源勺和 `bean_000` 沿用已冻结 M1/M3。M4 教师接入 12 点舀取、精确回平与沉降、渐进释放和固定避让；观测 schema 3 为 Panda 108／UR5e 106 维，新增当前接收面位姿。接口和门禁见 [M4 文档](docs/m4_interfaces.md)。
 
-当前完成状态只由匹配输入的 `outputs/single_bean/v1/m4/revision_3/<robot>/report.json` 及最终 `acceptance_audit.json` 确认。正式数据位于 `datasets/single_bean/v1/m4/panda/`；没有通过教师门禁不能采集。调试目录为 `outputs/single_bean/v1/m4_tuning/`。旧食物输出和诊断已清理，下文历史成绩不代表当前放行。
+当前正式范围仅 Panda；UR5e 实现与历史证据保留，暂停验收。完成状态只由 `outputs/single_bean/v1/m4/revision_4/panda/report.json`、`teacher_release_audit.json` 及最终 `acceptance_audit.json` 确认。修订 3 已通过的物理证据经校验承接，不重复运行；教师 v2、M4 接触确认 1.1 秒及其余物理门槛不变。正式数据位于 `datasets/single_bean/v1/m4/panda/`；没有通过教师门禁不能采集。调试目录为 `outputs/single_bean/v1/m4_tuning/`。旧食物输出和诊断已清理，下文历史成绩不代表当前放行。
 
 # FeedingRobot DPRL — 单豆喂餐原型
 
@@ -38,19 +38,19 @@ conda run -n feedingrobot python -m feedingrobot.scripts.validate_m1a --robot ur
 
 当前修订 4 采用 65° 下半部接入与原生 CCD 精度修正，单豆三组真实取豆及原数值对照通过；129 项相关测试、双机器人 M1-A/B 和 60 项共同初态沉降／viewer 回归通过。完整 15 豆仍有下降／勺侧夹挤，参数为 candidate，M1-C/D 不放行。证据及修改范围见 历史接触修正记录（旧食物报告已清理）。
 
-新勺子和新盘子已接入机械臂，共用完整碰撞模型、TCP/F/T 和执行链；碗保留但不启用。M1 正式验收与新模型证据见 [验收说明](docs/acceptance.md)。M3 双机器人正式物理验收已通过；M4 框架保留，教师放行待后续实施；尚未生成示范集或训练 DP/SAC。
+新勺子和新盘子已接入机械臂，共用完整碰撞模型、TCP/F/T 和执行链；碗保留但不启用。M1 正式验收与新模型证据见 [验收说明](docs/acceptance.md)。M3 双机器人正式物理验收已通过；M4 框架保留，教师通过已有证据承接放行，状态由修订 4 审计确认；尚未生成示范集或训练 DP/SAC。
 
 在 `feedingrobot` conda 环境中运行的状态驱动喂餐仿真基础。默认 Panda，支持通过配置切换六轴 UR5e；六维 TCP twist 经 Mink IK 转为 MuJoCo 内置关节位置伺服目标。
 
 M0/M1 提供 P0 接触场景、执行保护、腕部 F/T、环境自检和物理验收。M3 增加 50 Hz Gymnasium 环境、八阶段任务事件、接触判据、奖励和完整快照。M2 已取消；M4 教师和采集管线现已实现但尚未物理放行；正式 DP/SAC 策略训练尚未实施。
 
-## M4 教师与数据管线（未放行）
+## M4 教师与数据管线（仅 Panda）
 
-M4 已加入参数化教师、场景采样、20 Hz 动作／50 Hz 观测／物理子步日志、磁盘分片、恢复标注、独立数据划分与物理命令重放。新模型 M3 已正式通过，M4 待教师正式验收，启动示范集未生成；不能据接口或单次 pickup 声称 M4 完成。见 [M4 接口](docs/m4_interfaces.md)，新模型实施顺序与放行要求以 [主方案](SimModelPlann.md) 第 12 节为准。
+M4 已加入参数化教师、场景采样、20 Hz 动作／50 Hz 观测／物理子步日志、磁盘分片、恢复标注、独立数据划分与物理命令重放。新模型 M3 已正式通过，M4 复用修订 3 Panda 教师验收，启动示范集由修订 4 最终审计确认；不能据接口或单次 pickup 声称 M4 完成。见 [M4 接口](docs/m4_interfaces.md)，新模型实施顺序与放行要求以 [主方案](SimModelPlann.md) 第 12 节为准。
 
 ```bash
 conda run -n feedingrobot python -m feedingrobot.scripts.demo_m4 --robot panda --headless
-conda run -n feedingrobot python -m feedingrobot.scripts.validate_m4 --robot panda --workers 4
+conda run -n feedingrobot python -m feedingrobot.scripts.validate_m4 --robot panda --reuse-report outputs/single_bean/v1/m4/revision_3/panda/report.json
 conda run -n feedingrobot python -m feedingrobot.scripts.validate_m4 --robot ur5e --workers 2
 # 教师门槛通过后才允许执行：
 conda run -n feedingrobot python -m feedingrobot.scripts.collect --robot panda
@@ -123,7 +123,7 @@ conda run -n feedingrobot python -m pip check
 - `outputs/m0/doctor.json`：逐项环境与算法自检。
 - `outputs/single_bean/v1/m1/<robot>/`：重建后生成的新模型物理报告与轨迹。
 - `outputs/single_bean/v1/m3/<robot>/`：重建后生成的事件、快照、收敛和环境验收证据。
-- `outputs/single_bean/v1/m4/revision_3/<robot>/`：重建后生成的教师、重放及放行报告；正式采集显式传入匹配的 `--gate`。
+- `outputs/single_bean/v1/m4/revision_4/panda/`：单 Panda 承接与数据放行报告；修订 3 原始证据保留；正式采集显式传入匹配的 `--gate`。
 - `outputs/single_bean/v1/m4_tuning/`：新模型调试结果，与正式验收分开。
 - `SimModelPlann.md`：从 M1 重建的主方案；`docs/interfaces.md`：执行接口与坐标/时间契约，餐具坐标与完整工具负载已按新模型适配。
 
@@ -142,3 +142,5 @@ Menagerie 资产提交：`c96a32d28fb5da84da38c1da4d749e7a13212855`。
 M1-D 完整入口：`python -m feedingrobot.scripts.validate_m1 --robot all`，顺序验证 Panda、UR5e；单机器人和 `--cases` 局部验收不会发布冻结清单。历史 M1-D 报告已清理；仅最终 frozen 输入下双机器人全部必需项通过且结束哈希复核一致，才生成 `outputs/beans_native/v1/m1/freeze_manifest.json`。候选数值矩阵通过后须在最终输入下重新运行。控制 RTF 仅记录；沉降每组最多 5 s 仿真时间及 60 s 墙钟。控制对照覆盖 12 个运动用例，命令 20 ms、采样 10 ms，公共时间网格和终态比较 TCP、腕力峰值、语义接触峰值及 applied 冲量。跨数值回放只用于验收，不放宽公共 schema 3 快照检查。M3/M4 仍为 `not_verified`。
 
 M1-D 第一轮候选完整入口已实际顺序执行双机器人，退出码 1；A/B/C、viewer、性能及来源清单通过，两个机器人输入哈希前后相同。半步长及高精度取豆峰值对照超限，未冻结；历史候选证据已清理。阶段切换计时已修正为全回合共同 20 ms 命令网格，10 ms 采样不变；共同命令时钟完整复验已结束，命令返回 1；当时的报告已清理。两机器人 A/B/C、viewer、性能及来源清单通过，初态回放核验通过，运行前后及双机器人输入 SHA256 一致；M1-D 数值对照失败，参数保留 candidate，未生成 freeze_manifest.json。原修订 2 接触参数（solref 2 ms）及轨迹目标保持不变；2.5 ms 隔离试验不能通过 Panda seed 1 的 5 s 沉降门槛，不采用。掉落仍按首次确认即结束，终态按各自结束状态比较，时间差只记录。
+
+单 Panda M4：承接前只运行受影响的门禁／审计测试；正常／恢复各 train/validation/test=100/15/15。采集全部尝试首次严格重放后保存摘要绑定，`validate_m4 --cases dataset` 校验已通过统计和文件哈希，随后发布最终冻结，不再次推进旧验收或新数据重放。

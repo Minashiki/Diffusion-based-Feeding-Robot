@@ -12,7 +12,7 @@ from feedingrobot.data.episodes import annotate, input_hashes, load_episode, rec
 from feedingrobot.data.recipes import recipe
 from feedingrobot.data.rollout import run_episode
 from feedingrobot.data.replay import replay_many
-from feedingrobot.experts.gate import matching_teachers_passed
+from feedingrobot.experts.gate import panda_teacher_passed
 from feedingrobot.sim.model import ROOT
 
 
@@ -25,13 +25,21 @@ def check_gate(report, config, robot):
             or report.get("input_hashes") != input_hashes()
             or report.get("teacher_config") != config
             or report.get("parent_m3") != parent
-            or not matching_teachers_passed(report, report.get("compatibility", {}))):
-        raise ValueError("Formal collection requires matching frozen 100-seed acceptance and all physical teacher checks for both robots")
+            or not panda_teacher_passed(report)):
+        raise ValueError("Formal collection requires matching frozen 100-seed acceptance and all physical Panda teacher checks")
+    if report.get("evidence_origin"):
+        from feedingrobot.experts.reuse import verify_reuse_audit
+        verify_reuse_audit(report)
 
 
 def dataset_statistics(directory, *, config=None, robot=None, replay=False, workers=1):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
+    statistics = directory / "statistics.json"
+    if replay and statistics.exists():
+        saved = json.loads(statistics.read_text())
+        if saved.get("validation_sha256") and saved.get("status") == "passed":
+            return verified_statistics(directory, config=config, robot=robot)
     counts, recovery_counts, groups, seeds = {}, {}, {}, {}
     mean, m2, count = None, None, 0
     manifests = sorted(directory.glob("*/*/manifest.json"))
@@ -107,6 +115,47 @@ def dataset_statistics(directory, *, config=None, robot=None, replay=False, work
         write_json(directory / "normalization.json", dict(source_split="train", count=count,
                    mean=mean, std=np.where(raw_std > 1e-8, raw_std, 1.), raw_std=raw_std,
                    observation_schema=m["observation_schema"]))
+    if replay and episodes:
+        from feedingrobot.experts.freeze import sha256
+        summary.update(input_hashes=input_hashes(), teacher_config=config, robot_id=robot,
+                       evidence_sha256={str(p.relative_to(directory)): sha256(p)
+                           for p in sorted(directory.rglob("*")) if p.is_file()
+                           and p.name not in ("statistics.json", "replay_progress.json")})
+        summary["validation_sha256"] = statistics_digest(summary)
+        write_json(directory / "statistics.json", summary)
+    return summary
+
+
+def statistics_digest(summary):
+    import hashlib
+    bound = {k: v for k, v in summary.items() if k not in ("status", "quotas", "validation_sha256")}
+    return hashlib.sha256(json.dumps(bound, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def verified_statistics(directory, *, config, robot):
+    """Verify the collected statistics and replay evidence without rerunning physics."""
+    from feedingrobot.experts.freeze import sha256
+    directory = Path(directory)
+    summary = json.loads((directory / "statistics.json").read_text())
+    if (summary.get("validation_sha256") != statistics_digest(summary)
+            or summary.get("input_hashes") != input_hashes()
+            or summary.get("teacher_config") != config or summary.get("robot_id") != robot
+            or summary.get("status") != "passed" or summary.get("replay_status") != "passed"):
+        raise ValueError("Dataset statistics/replay do not match frozen inputs")
+    files = {str(p.relative_to(directory)) for p in directory.rglob("*") if p.is_file()
+             and p.name not in ("statistics.json", "replay_progress.json")}
+    if files != set(summary.get("evidence_sha256", {})):
+        raise ValueError("Dataset evidence coverage changed")
+    for relative, digest in summary["evidence_sha256"].items():
+        if sha256(directory / relative) != digest:
+            raise ValueError(f"Dataset evidence changed: {relative}")
+    manifests = {str(p.parent.relative_to(directory)) for p in directory.glob("*/*/manifest.json")}
+    if (manifests != {e["path"] for e in summary["episodes"]}
+            or len(manifests) != summary["attempts"]
+            or any(e["replay"]["status"] != "passed" for e in summary["episodes"])
+            or any(summary[key].get(split, 0) < quota for key in ("counts", "recovery_counts")
+                   for split, quota in config["quotas"].items())):
+        raise ValueError("Dataset requires complete quotas and replay coverage")
     return summary
 
 
@@ -128,7 +177,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--robot", choices=["panda", "ur5e"], default="panda")
     parser.add_argument("--config", default="configs/collect.json")
-    parser.add_argument("--gate", default="outputs/single_bean/v1/m4/revision_3/panda/report.json")
+    parser.add_argument("--gate", default="outputs/single_bean/v1/m4/revision_4/panda/report.json")
     parser.add_argument("--output")
     parser.add_argument("--workers", type=int, default=1)
     display = parser.add_mutually_exclusive_group()

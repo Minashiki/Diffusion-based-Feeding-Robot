@@ -20,10 +20,10 @@ from feedingrobot.data.rollout import run_episode
 from feedingrobot.envs import FeedingGymEnv
 from feedingrobot.experts import Teacher
 from feedingrobot.experts.geometry import teacher_geometry
-from feedingrobot.experts.gate import PRECOLLECTION_CASES, local_teacher_passed, matching_teachers_passed
+from feedingrobot.experts.gate import PRECOLLECTION_CASES, panda_teacher_passed
 from feedingrobot.experts.feasibility import check_waypoints
 from feedingrobot.experts.freeze import freeze_inputs, parent_m3_check, publish_acceptance
-from feedingrobot.scripts.collect import dataset_statistics
+from feedingrobot.scripts.collect import verified_statistics
 from feedingrobot.sim.model import ROOT, load_json
 
 CASES = PRECOLLECTION_CASES + ("dataset",)
@@ -224,14 +224,11 @@ def run_logged(command, path, timeout=None):
     return dict(command=command, log=str(path))
 
 
-def update_gate(report, companion):
-    passed = matching_teachers_passed(report, companion)
+def update_gate(report):
+    passed = panda_teacher_passed(report)
     report["teacher_gate"] = "passed" if passed else "not_verified"
-    if passed:
-        report["compatibility"] = {k: companion[k] for k in
-            ("robot_id", "cases", "baseline", "recovery_baseline", "input_hashes", "teacher_config", "parent_m3")}
-    else:
-        report.pop("compatibility", None)
+    report["acceptance_robots"] = ["panda"]
+    report.pop("compatibility", None)
     return passed
 
 
@@ -243,18 +240,23 @@ def main():
     parser.add_argument("--trials", type=int, help="Partial checks cannot release the teacher")
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--output")
-    parser.add_argument("--companion-report")
+    parser.add_argument("--reuse-report", help="Reuse unchanged Panda physical evidence; no simulation")
     parser.add_argument("--dataset")
     parser.add_argument("--headless", action="store_true")
     args = parser.parse_args()
     if args.workers < 1 or (args.trials is not None and args.trials < 1):
         parser.error("--trials and --workers must be positive")
     config = json.loads((ROOT / args.config).read_text())
-    output = ROOT / (args.output or f"outputs/single_bean/v1/m4/revision_3/{args.robot}")
+    output = ROOT / (args.output or f"outputs/single_bean/v1/m4/revision_4/{args.robot}")
     output.mkdir(parents=True, exist_ok=True)
     report_path = output / "report.json"
-    companion_path = ROOT / args.companion_report if args.companion_report else output.parent / (
-        "ur5e" if args.robot == "panda" else "panda") / "report.json"
+    if args.reuse_report:
+        if args.robot != "panda" or args.cases or args.trials:
+            parser.error("--reuse-report releases Panda evidence only; run dataset verification separately")
+        from feedingrobot.experts.reuse import reuse_teacher_report
+        reuse_teacher_report(ROOT / args.reuse_report, output, config)
+        print("M4 panda: incomplete; teacher gate: passed (reused evidence)")
+        return 0
     report = json.loads(report_path.read_text()) if report_path.exists() else {}
     if report and (report.get("input_hashes") != input_hashes() or report.get("teacher_config") != config):
         raise ValueError("Report belongs to different source/teacher; use a new --output")
@@ -263,13 +265,18 @@ def main():
     report.setdefault("cases", {name: dict(status="not_verified") for name in CASES})
     report["convergence_cases"] = convergence_cases(config)
     selected = args.cases or CASES
+    if report.get("evidence_origin"):
+        if selected != ["dataset"]:
+            parser.error("Reused reports only run --cases dataset; physical evidence is already accepted")
+        from feedingrobot.experts.reuse import verify_reuse_audit
+        verify_reuse_audit(report)
     report['parent_m3'] = parent_m3_check()
     if any(name in selected for name in ('teacher', 'recovery', 'convergence')):
         if config.get('teacher_status') != 'frozen':
             raise ValueError('Calibrate and freeze the teacher before independent acceptance')
         seeds = {robot: dict(normal=[recipe(config, 'acceptance', i)[0] for i in range(100 if robot == 'panda' else 5)],
                             recovery=[recipe(config, 'acceptance', i, recover=True)[0] for i in range(10 if robot == 'panda' else 5)],
-                            convergence=convergence_cases(config)) for robot in ('panda', 'ur5e')}
+                            convergence=convergence_cases(config)) for robot in ('panda',)}
         freeze_inputs(output.parent, config, seeds)
     for name in selected:
         write_json(report_path, report)
@@ -349,37 +356,29 @@ def main():
                     [sys.executable,"-m","feedingrobot.scripts.validate_m3","--robot",args.robot,"--output",str(output/'m3_regression')]]
                 result = dict(status="passed", checks=[run_logged(c,output/f"regression_{i}.log") for i,c in enumerate(commands)])
             else:
-                companion = json.loads(companion_path.read_text()) if companion_path.exists() else {}
-                if args.robot == "ur5e":
-                    result = dict(status="passed", scope="Compatibility only; no UR5e formal data")
-                elif not matching_teachers_passed(report, companion):
-                    result = dict(status="not_verified", reason="Both teachers require all precollection checks")
+                if not panda_teacher_passed(report):
+                    result = dict(status="not_verified", reason="Panda requires all precollection checks")
                 else:
                     directory = ROOT / (args.dataset or "datasets/single_bean/v1/m4/panda")
-                    stats = dataset_statistics(directory, config=config, robot=args.robot, replay=True, workers=args.workers)
+                    stats = verified_statistics(directory, config=config, robot=args.robot)
                     passed = stats["replay_status"] == "passed" and all(stats["counts"].get(s,0)>=n
                         and stats["recovery_counts"].get(s,0)>=n for s,n in config["quotas"].items())
                     if passed:
                         stats["status"] = "passed"
-                        write_json(directory / "statistics.json", stats)
                     result = dict(status="passed" if passed else "incomplete", statistics=stats)
             report["cases"][name] = result
         except Exception as exc:
             report["cases"][name] = dict(status="failed", reason=str(exc), traceback=traceback.format_exc())
         write_json(report_path, report)
-    companion = json.loads(companion_path.read_text()) if companion_path.exists() else {}
-    if update_gate(report, companion):
-        update_gate(companion, report)
-        companion["status"] = "passed" if all(c["status"] == "passed" for c in companion["cases"].values()) else "incomplete"
-        write_json(companion_path, companion)
+    update_gate(report)
     statuses = [c["status"] for c in report["cases"].values()]
     report["status"] = ("passed" if report["teacher_gate"] == "passed" and all(s=="passed" for s in statuses)
                         else "failed" if "failed" in statuses else "incomplete")
     write_json(report_path, report)
-    if report["status"] == "passed" and companion.get("status") == "passed":
+    if report["status"] == "passed":
         publish_acceptance(output.parent, config, ROOT / (args.dataset or "datasets/single_bean/v1/m4/panda"))
     print(f"M4 {args.robot}: {report['status']}; teacher gate: {report['teacher_gate']}")
-    return 0 if report["status"] == "passed" else 1
+    return 0 if report["teacher_gate"] == "passed" and all(report["cases"][n]["status"] == "passed" for n in selected) else 1
 
 
 if __name__ == "__main__":

@@ -15,10 +15,6 @@ def local_teacher_passed(report):
             and recovery.get("successes") == 5)
 
 
-def matching_teachers_passed(report, companion):
-    return (local_teacher_passed(report) and local_teacher_passed(companion)
-            and {report.get("robot_id"), companion.get("robot_id")} == {"panda", "ur5e"}
-            and report.get("input_hashes") == companion.get("input_hashes")
-            and report.get("teacher_config") == companion.get("teacher_config")
-            and report.get("parent_m3", {}).get("status") == "passed"
-            and report.get("parent_m3") == companion.get("parent_m3"))
+def panda_teacher_passed(report):
+    return (report.get("robot_id") == "panda" and local_teacher_passed(report)
+            and report.get("parent_m3", {}).get("status") == "passed")

@@ -71,17 +71,14 @@ def passed_reports(config):
                     baseline=dict(attempts=normal, successes=normal),
                     recovery_baseline=dict(attempts=recovery, successes=recovery),
                     cases={name:dict(status="passed") for name in PRECOLLECTION_CASES})
-    panda, ur5e = report("panda",100,10), report("ur5e",5,5)
-    panda["compatibility"] = ur5e
-    return panda
+    return report("panda",100,10)
 
 
-@pytest.mark.parametrize("robot,missing", [(r,c) for r in ("panda","ur5e") for c in PRECOLLECTION_CASES])
-def test_partial_physical_gate_cannot_collect(robot, missing):
+@pytest.mark.parametrize("missing", PRECOLLECTION_CASES)
+def test_partial_physical_gate_cannot_collect(missing):
     config = load_json("configs/collect.json")
     report = passed_reports(config)
-    target = report if robot=="panda" else report["compatibility"]
-    target["cases"][missing]["status"] = "not_verified"
+    report["cases"][missing]["status"] = "not_verified"
     with pytest.raises(ValueError, match="all physical"):
         check_gate(report,config,"panda")
 
@@ -90,7 +87,7 @@ def test_gate_accepts_completed_checks_but_rejects_changed_inputs():
     config = load_json("configs/collect.json")
     report = passed_reports(config)
     check_gate(report,config,"panda")
-    report["compatibility"]["input_hashes"] = {}
+    report["input_hashes"] = {}
     with pytest.raises(ValueError):
         check_gate(report,config,"panda")
 

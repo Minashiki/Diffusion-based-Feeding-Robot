@@ -46,6 +46,7 @@ def freeze_inputs(directory, config, seeds):
     else:
         frozen = dict(schema_version=1, status='candidate_frozen', model_version='single_bean_native_v1',
                       teacher_version=config['teacher_version'], observation_schema_version=3,
+                      acceptance_robots=["panda"],
                       teacher_config=config, parent_m3=parent, input_sha256=hashes, seeds=seeds)
         archive = directory / 'frozen_inputs'
         for relative, digest in hashes.items():
@@ -62,22 +63,24 @@ def freeze_inputs(directory, config, seeds):
 
 
 def publish_acceptance(directory, config, dataset):
-    from feedingrobot.experts.gate import matching_teachers_passed
-    reports = {robot: json.loads((directory / robot / 'report.json').read_text()) for robot in ('panda', 'ur5e')}
-    if (not matching_teachers_passed(reports['panda'], reports['ur5e'])
-            or any(any(case['status'] != 'passed' for case in report['cases'].values()) for report in reports.values())):
+    from feedingrobot.experts.gate import panda_teacher_passed
+    from feedingrobot.scripts.collect import verified_statistics
+    from feedingrobot.experts.reuse import verify_reuse_audit
+    reports = {"panda": json.loads((directory / "panda/report.json").read_text())}
+    report = reports["panda"]
+    if (not panda_teacher_passed(report) or report.get("teacher_gate") != "passed"
+            or report.get("input_hashes") != input_hashes() or report.get("teacher_config") != config
+            or any(case["status"] != "passed" for case in report["cases"].values())):
         return None
+    reused = verify_reuse_audit(report) if report.get("evidence_origin") else {}
     frozen = json.loads((directory / 'freeze_manifest.json').read_text())
     freeze_inputs(directory, config, frozen['seeds'])
-    statistics = json.loads((dataset / 'statistics.json').read_text())
-    if (statistics['status'] != 'passed' or statistics['replay_status'] != 'passed'
-            or any(statistics[key].get(split, 0) < quota for key in ('counts', 'recovery_counts')
-                   for split, quota in config['quotas'].items())):
-        raise ValueError('M4 requires a complete, replayed dataset')
+    statistics = verified_statistics(dataset, config=config, robot="panda")
     excluded = {directory / 'freeze_manifest.json', directory / 'acceptance_audit.json'}
     evidence = {str(p.relative_to(ROOT)): sha256(p) for folder in (directory, dataset)
                 for p in sorted(folder.rglob('*')) if p.is_file() and p not in excluded
                 and not p.is_relative_to(directory / 'frozen_inputs')}
+    evidence.update(reused.get("evidence_sha256", {}))
     if input_hashes() != frozen['input_sha256']:
         raise ValueError('M4 inputs changed during final audit')
     frozen.update(status='frozen', evidence_sha256=evidence,
@@ -85,6 +88,7 @@ def publish_acceptance(directory, config, dataset):
                   dataset=str(dataset.relative_to(ROOT)))
     write_json(directory / 'freeze_manifest.json', frozen)
     audit = dict(status='passed', teacher_gate='passed', dataset_gate='passed',
+                 acceptance_robots=["panda"], evidence_origin=report.get("evidence_origin"),
                  parent_m3=parent_m3_check(evidence=True), model_version=frozen['model_version'],
                  observation_schema_version=3, input_files=len(frozen['input_sha256']),
                  evidence_files=len(evidence), input_sha256=frozen['input_sha256'], evidence_sha256=evidence,
