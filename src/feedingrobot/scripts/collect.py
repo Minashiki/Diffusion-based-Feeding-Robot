@@ -1,30 +1,35 @@
 """Collect only after a frozen teacher passes independent acceptance."""
 
 import argparse
+from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
 import json
 from pathlib import Path
 
 import numpy as np
 
-from feedingrobot.data.episodes import annotate, input_hashes, load_episode, write_json
+from feedingrobot.data.episodes import annotate, input_hashes, load_episode, recovery_action_mask, write_json
 from feedingrobot.data.recipes import recipe
 from feedingrobot.data.rollout import run_episode
-from feedingrobot.data.replay import replay_episode
+from feedingrobot.data.replay import replay_many
 from feedingrobot.experts.gate import matching_teachers_passed
 from feedingrobot.sim.model import ROOT
 
 
 def check_gate(report, config, robot):
+    from feedingrobot.experts.freeze import parent_m3_check
+    parent = parent_m3_check()
     if (robot != "panda" or report.get("teacher_gate") != "passed" or report.get("robot_id") != robot
             or report.get("baseline", {}).get("attempts") != 100
             or report.get("baseline", {}).get("successes", 0) < 95
             or report.get("input_hashes") != input_hashes()
             or report.get("teacher_config") != config
+            or report.get("parent_m3") != parent
             or not matching_teachers_passed(report, report.get("compatibility", {}))):
         raise ValueError("Formal collection requires matching frozen 100-seed acceptance and all physical teacher checks for both robots")
 
 
-def dataset_statistics(directory, *, config=None, robot=None, replay=False):
+def dataset_statistics(directory, *, config=None, robot=None, replay=False, workers=1):
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     counts, recovery_counts, groups, seeds = {}, {}, {}, {}
@@ -32,6 +37,12 @@ def dataset_statistics(directory, *, config=None, robot=None, replay=False):
     manifests = sorted(directory.glob("*/*/manifest.json"))
     episodes = []
     version = None
+    expected_schema = None
+    if robot is not None:
+        from feedingrobot.envs import FeedingGymEnv
+        env = FeedingGymEnv(robot)
+        expected_schema = json.loads(json.dumps(env.schema))
+        env.close()
     for path in manifests:
         m, a = load_episode(path.parent)
         current = (m["robot_id"], m["observation_schema"], m["teacher_config"], m["input_hashes"])
@@ -40,12 +51,15 @@ def dataset_statistics(directory, *, config=None, robot=None, replay=False):
         elif current != version:
             raise ValueError("Dataset contains mixed robot/schema/teacher/input versions")
         if config is not None and (m["teacher_config"] != config or m["input_hashes"] != input_hashes()
-                                   or m["robot_id"] != robot):
+                                   or m["robot_id"] != robot or m["observation_schema"] != expected_schema):
             raise ValueError("Dataset does not match frozen teacher inputs")
         if m["segments"] != annotate(m["events"]):
             raise ValueError("Episode recovery annotations do not match physical events")
+        recovery_mask = recovery_action_mask(m['segments'], a['action_phases'], a['action_ticks'],
+                                             a['action_end_ticks'], a['action_mask'], m['dt'])
         if (m["accepted_normal"] != m["success"]
-                or m["accepted_recovery"] != any(s["recovery_valid"] for s in m["segments"])):
+                or m["accepted_recovery"] != bool(np.any(recovery_mask))
+                or m["recovery_action_rows"] != int(np.count_nonzero(recovery_mask))):
             raise ValueError("Episode selection flags do not match outcomes")
         split = m["split"]
         if split not in ("train", "validation", "test"):
@@ -67,9 +81,7 @@ def dataset_statistics(directory, *, config=None, robot=None, replay=False):
             assert not any(e["name"] == "phase" and start < e["time"] < end - 1e-10 for e in m["events"])
         eligible = a["action_mask"].copy()
         if not normal:
-            eligible &= a["action_phases"] == 7
-            eligible &= np.array([any(s["recovery_valid"] and s["start_s"] <= tick*m["dt"] < s["end_s"]
-                                     for s in m["segments"]) for tick in a["action_ticks"]])
+            eligible &= recovery_mask
         if split == "train":
             x = a["action_observations"][eligible]
             if len(x):
@@ -83,8 +95,10 @@ def dataset_statistics(directory, *, config=None, robot=None, replay=False):
                 count += len(x)
         episodes.append(dict(path=str(path.parent.relative_to(directory)), seed=seed, split=split,
                              normal=normal, recovery=recovery, failure_reason=m["failure_reason"]))
-        if replay:
-            episodes[-1]["replay"] = replay_episode(path.parent)
+    if replay:
+        checks = replay_many([p.parent for p in manifests], workers=workers, progress=directory / 'replay_progress.json')
+        for episode, check in zip(episodes, checks):
+            episode['replay'] = check
     summary = dict(schema_version=1, status="incomplete", counts=counts, recovery_counts=recovery_counts, attempts=len(episodes), episodes=episodes,
                    replay_status="passed" if replay and episodes else "not_verified")
     write_json(directory / "statistics.json", summary)
@@ -96,21 +110,38 @@ def dataset_statistics(directory, *, config=None, robot=None, replay=False):
     return summary
 
 
+def collection_trial(robot, config, directory, split, index, recover, viewer):
+    seed, scenario, parameters, group = recipe(config, split, index, recover=recover)
+    episode = directory / split / f"{'recovery' if recover else 'normal'}_{seed}"
+    if episode.exists():
+        result, _ = load_episode(episode)
+        if (result['input_hashes'] != input_hashes() or result['teacher_config'] != config
+                or result['robot_id'] != robot):
+            raise ValueError('Cannot resume collection with changed teacher/source')
+    else:
+        result = run_episode(robot, seed, config, episode, scenario=scenario,
+                             teacher_parameters=parameters, split=split, group_id=group, viewer=viewer)
+    return dict(seed=seed, accepted=bool(result['accepted_recovery'] if recover else result['accepted_normal']))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--robot", choices=["panda", "ur5e"], default="panda")
     parser.add_argument("--config", default="configs/collect.json")
-    parser.add_argument("--gate", default="outputs/new_tableware/v3/m4/panda/report.json")
+    parser.add_argument("--gate", default="outputs/single_bean/v1/m4/revision_3/panda/report.json")
     parser.add_argument("--output")
+    parser.add_argument("--workers", type=int, default=1)
     display = parser.add_mutually_exclusive_group()
     display.add_argument("--viewer", dest="viewer", action="store_true")
     display.add_argument("--headless", dest="viewer", action="store_false")
     parser.set_defaults(viewer=True)
     parser.add_argument("--train-episodes", type=int, help="Override train quota, e.g. 1000; held-out quotas unchanged")
     args = parser.parse_args()
+    if args.workers < 1:
+        parser.error("--workers must be positive")
     config = json.loads((ROOT / args.config).read_text())
     check_gate(json.loads((ROOT / args.gate).read_text()), config, args.robot)
-    directory = ROOT / (args.output or f"datasets/new_tableware/v3/m4/{args.robot}")
+    directory = ROOT / (args.output or f"datasets/single_bean/v1/m4/{args.robot}")
     directory.mkdir(parents=True, exist_ok=True)
     quotas = dict(config["quotas"])
     if args.train_episodes is not None:
@@ -120,26 +151,24 @@ def main():
     for split, quota in quotas.items():
         for recover in (False, True):
             accepted = 0
-            for index in range(quota * config["max_attempt_multiplier"]):
-                seed, scenario, parameters, group = recipe(config, split, index, recover=recover)
-                episode = directory / split / f"{'recovery' if recover else 'normal'}_{seed}"
-                if episode.exists():
-                    result, _ = load_episode(episode)
-                    if (result["input_hashes"] != input_hashes() or result["teacher_config"] != config
-                            or result["robot_id"] != args.robot):
-                        raise ValueError("Cannot resume collection with changed teacher/source")
+            index, limit = 0, quota*config['max_attempt_multiplier']
+            while accepted < quota and index < limit:
+                count = min(args.workers, quota-accepted, limit-index)
+                inputs = [(args.robot, config, directory, split, i, recover, args.viewer and i == index)
+                          for i in range(index, index+count)]
+                if args.workers == 1:
+                    batch = [collection_trial(*inputs[0])]
                 else:
-                    result = run_episode(args.robot, seed, config, episode, scenario=scenario,
-                                         teacher_parameters=parameters, split=split, group_id=group,
-                                         viewer=args.viewer)
-                accepted += int(result["accepted_recovery"] if recover else result["accepted_normal"])
-                print(f"{split} {'recovery' if recover else 'normal'}: {accepted}/{quota} (seed={seed})", flush=True)
-                if accepted >= quota:
-                    break
+                    with ProcessPoolExecutor(max_workers=count, mp_context=multiprocessing.get_context('spawn')) as pool:
+                        batch = [f.result() for f in [pool.submit(collection_trial, *values) for values in inputs]]
+                for result in batch:
+                    accepted += int(result['accepted'])
+                    print(f"{split} {'recovery' if recover else 'normal'}: {accepted}/{quota} (seed={result['seed']})", flush=True)
+                index += count
             if accepted < quota:
-                dataset_statistics(directory, config=config, robot=args.robot, replay=True)
+                dataset_statistics(directory, config=config, robot=args.robot, replay=True, workers=args.workers)
                 raise RuntimeError(f"Quota unmet: {split}, recovery={recover}, {accepted}/{quota}")
-    summary = dataset_statistics(directory, config=config, robot=args.robot, replay=True)
+    summary = dataset_statistics(directory, config=config, robot=args.robot, replay=True, workers=args.workers)
     summary["status"] = "passed"
     summary["quotas"] = quotas
     write_json(directory / "statistics.json", summary)

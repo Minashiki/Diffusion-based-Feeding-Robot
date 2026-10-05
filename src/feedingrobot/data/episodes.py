@@ -28,7 +28,12 @@ def input_hashes(config_path="configs/collect.json"):
     paths = sorted(set(list((ROOT / "src/feedingrobot").rglob("*.py"))
                        + list((ROOT / "configs").rglob("*.json"))
                        + asset_files()
-                       + [ROOT / "requirements.lock.txt", ROOT / config_path]))
+                       + list((ROOT / "tests").rglob("*.py"))
+                       + list((ROOT / "tools").glob("*.py"))
+                       + [p for p in (ROOT / "docs").rglob("*") if p.is_file()]
+                       + [ROOT / name for name in ("requirements.lock.txt", "third_party_manifest.json",
+                                                  "README.md", "SimModelPlann.md", "pyproject.toml")]
+                       + [ROOT / config_path]))
     return {str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else str(p):
             hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
 
@@ -80,11 +85,13 @@ class EpisodeWriter:
         self.obs_phases.append(phase)
         self.obs_valid.append(valid)
 
-    def command(self, tick, twist=None, valid_until=None, *, hold_reference=False):
+    def command(self, tick, twist=None, valid_until=None, *, hold_reference=False, after_physics=False):
         # Stop is a distinct operation, not an artificial zero action label.
         self.commands.append(dict(tick=tick, kind="stop" if twist is None else "twist",
                                   twist=None if twist is None else np.asarray(twist).tolist(),
                                   valid_until=valid_until))
+        if twist is None:
+            self.commands[-1]["after_physics"] = after_physics
         if hold_reference:
             self.commands[-1]["hold_reference"] = True
 
@@ -128,6 +135,12 @@ def load_episode(directory):
     manifest = json.loads((directory / "manifest.json").read_text())
     if manifest["schema_version"] != 1 or manifest["status"] != "complete":
         raise ValueError("Incomplete or incompatible episode")
+    from feedingrobot.envs.feeding import observation_schema
+    from feedingrobot.sim.model import load_json
+    robot = manifest['robot_id']
+    expected_schema = observation_schema(robot, len(load_json(f'configs/robots/{robot}.json')['joints']))
+    if manifest['observation_schema'] != json.loads(json.dumps(expected_schema)):
+        raise ValueError('Episode observation schema differs from the current contract')
     for name, expected in manifest["files_sha256"].items():
         if hashlib.sha256((directory / name).read_bytes()).hexdigest() != expected:
             raise ValueError(f"Episode file hash mismatch: {name}")
@@ -148,3 +161,10 @@ def annotate(events):
             segments.append(dict(phase=event["phase"], start_s=event["time"], end_s=end["time"],
                                  recovery_valid=recovered, end_event=end["name"]))
     return segments
+
+
+def recovery_action_mask(segments, phases, ticks, end_ticks, mask, dt):
+    return np.asarray(mask, dtype=bool) & (np.asarray(phases) == 7) & np.array([
+        any(s['recovery_valid'] and s['start_s'] <= start*dt+1e-10
+            and end*dt <= s['end_s']+1e-10 for s in segments)
+        for start, end in zip(ticks, end_ticks)], dtype=bool)

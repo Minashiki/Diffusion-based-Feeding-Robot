@@ -1,0 +1,19 @@
+{
+  "schema_version": 3,
+  "scope": "Single-bean M4 revision 3: revision 2 teacher retained; user authorized contact confirmation tolerance 1.1 s; other M3 tolerances unchanged",
+  "event_time_tolerance_s": 0.4,
+  "preparation_event_time_tolerance_s": 1.0,
+  "contact_event_time_tolerance_s": 1.1,
+  "failure_time_tolerance_s": 0.01,
+  "tcp_path_comparison": "normalized arc length per action; mouth frame for entry and retraction; receiver frame for release",
+  "tcp_position_tolerance_m": 0.002,
+  "force_absolute_tolerance_n": 0.05,
+  "force_relative_tolerance": 0.2,
+  "impulse_absolute_tolerance_ns": 0.005,
+  "impulse_relative_tolerance": 0.2,
+  "seeds": [
+    0,
+    1,
+    2
+  ]
+}

@@ -18,9 +18,9 @@ def _display(model, initial_state, frames, messages, ready, stop):
     displayed = 0
     try:
         with passive_viewer(model, data) as viewer:
-            plate = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "plate_frame")
+            bowl = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "bowl_frame")
             mouth = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "mouth_entry")
-            viewer.cam.lookat[:] = (data.site_xpos[plate] + data.site_xpos[mouth]) / 2
+            viewer.cam.lookat[:] = (data.site_xpos[bowl] + data.site_xpos[mouth]) / 2
             viewer.cam.distance, viewer.cam.azimuth, viewer.cam.elevation = 1.1, 135., -30.
             viewer.sync(state_only=True)
             messages.put(dict(status="running"))

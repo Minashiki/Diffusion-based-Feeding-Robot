@@ -1,6 +1,6 @@
 """Pre-collection teacher checks, independent of dataset completion."""
 
-PRECOLLECTION_CASES = ("feasibility", "calibration", "teacher", "recovery", "convergence", "replay", "viewer", "regressions")
+PRECOLLECTION_CASES = ("feasibility", "calibration", "teacher", "recovery", "convergence", "prior_revision", "replay", "viewer", "regressions")
 
 
 def local_teacher_passed(report):
@@ -19,4 +19,6 @@ def matching_teachers_passed(report, companion):
     return (local_teacher_passed(report) and local_teacher_passed(companion)
             and {report.get("robot_id"), companion.get("robot_id")} == {"panda", "ur5e"}
             and report.get("input_hashes") == companion.get("input_hashes")
-            and report.get("teacher_config") == companion.get("teacher_config"))
+            and report.get("teacher_config") == companion.get("teacher_config")
+            and report.get("parent_m3", {}).get("status") == "passed"
+            and report.get("parent_m3") == companion.get("parent_m3"))

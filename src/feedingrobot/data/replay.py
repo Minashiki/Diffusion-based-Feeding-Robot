@@ -22,6 +22,9 @@ def replay_episode(directory, *, viewer=False):
         raise ValueError("Replay requires the recorded source/configuration hashes")
     env = FeedingGymEnv(manifest["robot_id"], timestep=manifest["dt"],
                        max_episode_s=manifest["max_episode_s"])
+    if json.loads(json.dumps(env.schema)) != manifest["observation_schema"]:
+        env.close()
+        raise ValueError("Replay observation schema differs from the recorded episode")
     env.task.model.opt.iterations = manifest["solver_iterations"]
     env.task.model.opt.tolerance = manifest["solver_tolerance"]
     env.reset(seed=manifest["seed"], options={"scenario": manifest["scenario"]})
@@ -58,6 +61,9 @@ def replay_episode(directory, *, viewer=False):
             # Phase cancellations happened after this physical boundary and before sampling.
             while (cursor < len(commands) and commands[cursor]["tick"] == task.tick
                    and commands[cursor]["kind"] == "stop"
+                   and commands[cursor].get("after_physics", any(
+                       event["name"] == "phase" and abs(event["time"]-task.data.time) < 1e-9
+                       for event in manifest["events"]))
                    and index + 1 < manifest["physics_rows"]):
                 task.adapter.stop(hold_reference=commands[cursor].get("hold_reference", False))
                 cursor += 1
@@ -99,3 +105,36 @@ def replay_episode(directory, *, viewer=False):
         if display:
             display.close()
         env.close()
+
+
+def replay_many(paths, *, workers=1, progress=None):
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    import multiprocessing
+    from feedingrobot.data.episodes import write_json
+    paths = list(paths)
+    results = {}
+    def record(index, result):
+        results[index] = result
+        if progress is not None:
+            write_json(progress, [results[i] for i in sorted(results)])
+    if workers == 1:
+        for i, path in enumerate(paths):
+            try:
+                result = replay_episode(path)
+            except Exception as exc:
+                result = dict(status='failed', episode=str(path), error=str(exc))
+            record(i, result)
+    else:
+        with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context('spawn')) as pool:
+            futures = {pool.submit(replay_episode, path): i for i, path in enumerate(paths)}
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                except Exception as exc:
+                    result = dict(status='failed', episode=str(paths[futures[future]]), error=str(exc))
+                record(futures[future], result)
+    ordered = [results[i] for i in range(len(paths))]
+    failures = [r for r in ordered if r['status'] != 'passed']
+    if failures:
+        raise AssertionError(f'{len(failures)} physical replays failed: {failures}')
+    return ordered

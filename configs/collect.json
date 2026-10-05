@@ -1,33 +1,35 @@
 {
   "schema_version": 2,
   "teacher": {
-    "scoop_yaw_rad": 0.0,
-    "scoop_pitch_rad": 1.1,
-    "scoop_start_offset_m": 0.035,
-    "scoop_travel_m": 0.02,
-    "plate_gap_m": 0.0005,
-    "approach_clearance_m": 0.06,
-    "lift_clearance_m": 0.12,
-    "tilt_clearance_m": 0.04,
-    "capture_margin_m": 0.0001,
+    "entry_pitch_offset_rad": 0.0,
+    "lift_height_offset_m": 0.0,
     "carry_pitch_rad": 0.0,
     "linear_speed_m_s": 0.025,
-    "angular_speed_rad_s": 0.5,
     "transport_speed_m_s": 0.05,
     "position_gain": 3.0,
     "orientation_gain": 3.0,
-    "waypoint_tolerance_m": 0.001,
-    "orientation_tolerance_rad": 0.03,
-    "pickup_hold_s": 0.2,
+    "pickup_hold_s": 1.0,
     "insert_depth_m": 0.004,
     "insert_height_m": -0.006,
-    "release_pitch_rad": 0.35,
-    "scoop_exit_pitch_rad": 0.0,
-    "arc_start_offset_m": 0.015,
-    "arc_length_m": 0.03,
-    "max_slide_speed_m_s": 0.01,
-    "carry_margin_m": 0.006,
-    "roll_speed_m_s": 0.025
+    "release_rotation_rad": [
+      -1.0,
+      0.4,
+      0.0
+    ],
+    "release_offset_m": [
+      0.004,
+      -0.008,
+      0.0
+    ],
+    "release_avoidance_m": [
+      -0.003,
+      -0.003,
+      0.001
+    ],
+    "release_clearance_m": 0.001,
+    "release_rate_s_inv": 0.3,
+    "earliest_transport_start_s": 40.0,
+    "release_settle_s": 0.5
   },
   "quotas": {
     "train": 100,
@@ -37,20 +39,12 @@
   "max_attempt_multiplier": 3,
   "seed_bases": {
     "calibration": 0,
-    "acceptance": 10000,
+    "acceptance": 11000,
     "train": 20000,
     "validation": 30000,
     "test": 40000
   },
   "scenario_ranges": {
-    "food_mass_kg": [
-      0.0029,
-      0.0031
-    ],
-    "food_friction": [
-      0.14,
-      0.16
-    ],
     "head_amp_m": [
       0.005,
       0.01
@@ -60,13 +54,33 @@
       0.2
     ]
   },
-  "teacher_ranges": {},
+  "teacher_ranges": {
+    "entry_pitch_offset_rad": [
+      -0.017453292519943295,
+      0.017453292519943295
+    ],
+    "lift_height_offset_m": [
+      -0.005,
+      0.005
+    ],
+    "carry_pitch_rad": [
+      -0.017453292519943295,
+      0.017453292519943295
+    ]
+  },
   "scene": {
     "head_origin_m": [
       0.55,
       0.12,
       0.35
-    ]
+    ],
+    "recover_departure_m": 0.008
   },
-  "teacher_status": "calibrating"
+  "teacher_status": "frozen",
+  "model_version": "single_bean_native_v1",
+  "teacher_version": "single_bean_teacher_v2",
+  "prior_acceptance": {
+    "directory": "outputs/single_bean/v1/m4",
+    "manifest_sha256": "ccbe29926b944ee629dd76c70b5c276c65122e419478f075119c1836af624a7c"
+  }
 }

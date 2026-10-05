@@ -3,6 +3,8 @@
 import mink
 import numpy as np
 
+from feedingrobot.control.adapter import clip_norm
+
 
 def check_waypoints(task, waypoints):
     configuration = mink.Configuration(task.model)
@@ -20,6 +22,12 @@ def check_waypoints(task, waypoints):
                               (target.rotation() @ actual.rotation().inverse()).log()]
                 if np.linalg.norm(error[:3]) <= .002 and np.linalg.norm(error[3:]) <= .02:
                     break
+                # Continue through bounded TCP goals, as the execution adapter does,
+                # instead of asking differential IK to jump to a remote frame.
+                incremental = mink.SE3.from_rotation_and_translation(
+                    mink.SO3.exp(clip_norm(error[3:], task.robot_config["angular_speed_limit"]*.01)) @ actual.rotation(),
+                    actual.translation()+clip_norm(error[:3], task.robot_config["linear_speed_limit"]*.01))
+                frame.set_target(incremental)
                 velocity = mink.solve_ik(configuration, [frame], .01, solver="daqp", limits=task.adapter.limits,
                                          constraints=[task.adapter.freeze], damping=1e-5, safety_break=True)
                 configuration.integrate_inplace(velocity, .01)

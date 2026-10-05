@@ -30,7 +30,7 @@ def test_checkers_registration_and_schema(env):
     registered = gym.make("FeedingRobot-v0", robot_id=env.task.robot_id)
     obs, _ = registered.reset(seed=10)
     assert registered.observation_space.contains(obs)
-    assert obs.shape == (82 + 2 * env.task.index.n,)
+    assert obs.shape == (94 + 2 * env.task.index.n,)
     registered.close()
     policy = env.task.provider.observe()["policy_obs"]
     assert not {"future_events", "seed", "contacts", "timers"}.intersection(policy)

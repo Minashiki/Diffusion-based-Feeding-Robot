@@ -27,9 +27,9 @@ def test_geometry_is_static_copy_and_retains_curved_collision_surface(robot):
     assert np.ptp(g["scoop_points"][:, 2]) > .009
     assert g["tool_points"][:, 0].min() < -.09
     assert not g["scoop_points"].flags.writeable
-    original = g["plate_position"].copy()
+    original = g["bowl_position"].copy()
     env.reset(seed=7)
-    np.testing.assert_array_equal(g["plate_position"], original)
+    np.testing.assert_array_equal(g["bowl_position"], original)
     assert g["sha256"] == teacher_geometry(env.task)["sha256"]
     env.close()
 
@@ -48,31 +48,26 @@ def test_teacher_requires_new_config_and_measured_geometry():
     env.close()
 
 
-def test_arc_turns_spoon_and_preserves_clearance_of_actual_orientation():
+def test_pitch_variation_recomputes_entry_height_without_changing_physics():
+    from feedingrobot.experts.bean_path import pickup_path
     env = FeedingGymEnv()
     env.reset(seed=0)
-    teacher = Teacher(env.task.robot_config, load_json("configs/collect.json"))
-    teacher.reset({}, geometry=teacher_geometry(env.task))
-    obs = env.task.provider.observe()["policy_obs"]
-    teacher.act(obs)
-    teacher.part = 3
-    p, g = teacher.parameters, teacher.geometry
-    obs["tcp_position"] = teacher.food_start-g["plate_rotation"][:,0]*p["arc_start_offset_m"]
-    initial_r, initial_points = teacher.acquisition_waypoints(obs)
-    obs["tcp_rotation"] = initial_r.copy()
-    obs["tcp_position"] += g["plate_rotation"][:,0]*p["arc_length_m"]
-    final_r, final_points = teacher.acquisition_waypoints(obs)
-    assert np.linalg.norm(final_r-initial_r) > .5
-    lowest = ((g["scoop_points"] @ initial_r.T) @ g["plate_rotation"])[:,2].min()
-    target_z = g["plate_rotation"][:,2] @ (final_points[2]-g["plate_position"])
-    assert target_z+lowest >= p["plate_gap_m"]-1e-12
+    geometry = teacher_geometry(env.task)
+    base, variant = pickup_path(geometry), pickup_path(geometry, {"entry_pitch_offset_rad": np.deg2rad(1.)})
+    assert np.linalg.norm(base[2][2]-variant[2][2]) > .01
+    for path in (base, variant):
+        _, position, rotation, _ = path[2]
+        lowest = (geometry["scoop_points"] @ rotation.T)[:, 2].min()
+        assert position[2]+lowest == pytest.approx(geometry["bowl_position"][2]+.0005)
     env.close()
 
 
 def passed_reports(config):
     hashes = input_hashes()
+    from feedingrobot.experts.freeze import parent_m3_check
+    parent = parent_m3_check()
     def report(robot, normal, recovery):
-        return dict(robot_id=robot, teacher_gate="passed", teacher_config=config, input_hashes=hashes,
+        return dict(parent_m3=parent, robot_id=robot, teacher_gate="passed", teacher_config=config, input_hashes=hashes,
                     baseline=dict(attempts=normal, successes=normal),
                     recovery_baseline=dict(attempts=recovery, successes=recovery),
                     cases={name:dict(status="passed") for name in PRECOLLECTION_CASES})
@@ -147,4 +142,4 @@ def test_unmet_collection_quota_replays_all_attempts_before_reporting_failure(tm
     with pytest.raises(RuntimeError,match="Quota unmet"):
         collect.main()
     assert len(attempts)==3
-    assert checks==[dict(config=config,robot="panda",replay=True)]
+    assert checks==[dict(config=config,robot="panda",replay=True,workers=1)]

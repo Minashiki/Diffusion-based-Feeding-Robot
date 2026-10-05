@@ -39,83 +39,65 @@ def test_teacher_units_bounds_and_no_physics_writes(robot):
     env.close()
 
 
-def test_acquisition_rotates_then_approaches_plate_frame():
+def test_acquisition_tracks_measured_single_bean_waypoints():
     env = FeedingGymEnv()
     env.reset(seed=0)
     teacher = Teacher(env.task.robot_config, load_json("configs/collect.json"))
     teacher.reset({}, geometry=teacher_geometry(env.task))
     obs = env.task.provider.observe()["policy_obs"]
-    position = obs["tcp_position"].copy()
-    command = teacher.act(obs)
-    np.testing.assert_array_equal(teacher.target_position, position)
-    np.testing.assert_array_equal(command[:3], np.zeros(3))
-    obs["stage"] = "ACQUIRE"
-    obs["tcp_rotation"] = teacher.target_rotation.copy()
-    teacher.act(obs)
-    teacher.act(obs)
-    np.testing.assert_allclose(teacher.target_position[2], teacher.geometry["plate_position"][2]
-                               + teacher.parameters["approach_clearance_m"])
+    for index, (name, target, rotation, speed) in enumerate(teacher.path):
+        teacher.act(obs)
+        assert teacher.stage == name and teacher.part == index
+        np.testing.assert_array_equal(teacher.target_position, target)
+        obs["tcp_position"], obs["tcp_rotation"] = target.copy(), rotation.copy()
     env.close()
 
 
-def test_scoop_endpoint_is_bounded_when_food_is_pushed_forward():
+def test_scoop_endpoint_is_bounded_when_bean_is_pushed_forward():
     env = FeedingGymEnv()
     env.reset(seed=0)
     teacher = Teacher(env.task.robot_config, load_json("configs/collect.json"))
     teacher.reset({}, geometry=teacher_geometry(env.task))
     obs = env.task.provider.observe()["policy_obs"]
-    teacher.act(obs)
-    teacher.part = 3  # Isolate a teacher subsegment, not a physical pickup claim.
-    obs["stage"] = "ACQUIRE"
+    teacher.part = 3
     teacher.act(obs)
     target = teacher.target_position.copy()
-    obs["food_relative_world"] = obs["food_relative_world"] + np.array([.1, 0., 0.])
+    obs["bean_relative_world"] += np.array([.1, 0., 0.])
+    obs["stage"] = "TRANSPORT"
     teacher.act(obs)
     np.testing.assert_array_equal(teacher.target_position, target)
-    assert np.linalg.norm(target[:2] - teacher.food_start[:2]) <= teacher.parameters["scoop_travel_m"] + 1e-12
-    obs["stage"] = "TRANSPORT"
-    command = teacher.act(obs)
-    np.testing.assert_array_equal(teacher.target_position, target)
-    assert teacher.capture_position is None and teacher.part == 3
-    assert np.linalg.norm(command[:3]) <= teacher.parameters["linear_speed_m_s"]
+    assert teacher.part == 3 and not teacher.pickup_lift_complete
     env.close()
 
 
-def test_pickup_phase_continues_lift_and_requires_uninterrupted_hold():
+def test_pickup_phase_finishes_seating_and_waits_one_second():
     env = FeedingGymEnv()
     env.reset(seed=0)
     teacher = Teacher(env.task.robot_config, load_json("configs/collect.json"))
     teacher.reset({}, geometry=teacher_geometry(env.task))
     obs = env.task.provider.observe()["policy_obs"]
-    teacher.act(obs)
-    teacher.capture_roll_complete = True
-    teacher.part = 4
-    teacher.capture_position = obs["tcp_position"].copy()
-    obs["tcp_position"] = obs["tcp_position"].copy()
-    obs["tcp_position"][2] = .03
-    obs["interaction"] = np.array([1., 0., 0., 0.])
-    obs["stage"] = "ACQUIRE"
-    teacher.act(obs)
+    teacher.part = len(teacher.path)-1
     obs["stage"] = "TRANSPORT"
-    command = teacher.act(obs)
-    np.testing.assert_allclose(teacher.target_position[2], teacher.geometry["plate_position"][2] + teacher.parameters["lift_clearance_m"], atol=1e-12)
-    assert np.linalg.norm(command[:3]) <= teacher.parameters["linear_speed_m_s"]
-    obs["tcp_position"] = teacher.target_position.copy()
-    obs["tcp_rotation"] = teacher.target_rotation.copy()
-    obs["time"] = 1.
-    teacher.act(obs)
-    assert not teacher.pickup_lift_complete
-    obs["tcp_rotation"] = teacher.target_rotation.copy()
-    obs["time"] = 1.1
-    obs["interaction"][0] = 0.
-    teacher.act(obs)
-    assert teacher.lift_ready_since is None
-    obs["time"] = 1.15
     obs["interaction"][0] = 1.
     teacher.act(obs)
-    assert not teacher.pickup_lift_complete
-    obs["time"] = 1.15 + teacher.parameters["pickup_hold_s"] + .01
+    assert not teacher.pickup_lift_complete and teacher.stage == "wall_seat_level"
+    obs["tcp_position"], obs["tcp_rotation"] = (x.copy() for x in teacher.path[-1][1:3])
+    obs["time"] = 1.
     teacher.act(obs)
+    assert teacher.stage == "pickup_hold" and not teacher.pickup_lift_complete
+    np.testing.assert_array_equal(teacher.act(dict(obs, time=1.99)), np.zeros(6))
+    teacher.act(dict(obs, time=2.))
+    assert not teacher.pickup_lift_complete
+    start = teacher.parameters["earliest_transport_start_s"]
+    teacher.act(dict(obs, time=start))
+    assert teacher.pickup_lift_complete and teacher.stage == "transport"
+    teacher.reset({}, geometry=teacher_geometry(env.task))
+    assert teacher.pickup_hold_start is None and not teacher.pickup_lift_complete
+    teacher.part = len(teacher.path)-1
+    teacher.act(dict(obs,time=start-.5))
+    teacher.act(dict(obs,time=start))
+    assert not teacher.pickup_lift_complete
+    teacher.act(dict(obs,time=start+.5))
     assert teacher.pickup_lift_complete
     env.close()
 
@@ -165,6 +147,7 @@ def test_phase_hold_preserves_servo_offset_but_fault_stop_reanchors(robot):
 @pytest.mark.parametrize("robot", ["panda", "ur5e"])
 def test_scenario_seed_reset_snapshot_and_policy_partition(robot):
     env = FeedingGymEnv(robot)
+    nominal_mass = env.task.model.body_mass[env.task.index.bean_bodies[0]]
     seed, scenario, parameters, group = recipe(load_json("configs/collect.json"), "train", 0, recover=True)
     obs, _ = env.reset(seed=seed, options={"scenario": scenario})
     state = env.get_state()
@@ -179,7 +162,7 @@ def test_scenario_seed_reset_snapshot_and_policy_partition(robot):
     np.testing.assert_array_equal(other.step(np.zeros(6))[0], result[0])
     assert not {"parameters", "future_events", "closure_start", "food_mass_kg"}.intersection(env.task.provider.observe()["policy_obs"])
     env.reset(seed=0)
-    assert env.task.model.body_mass[env.task.index.food_body] == .003
+    assert env.task.model.body_mass[env.task.index.bean_bodies[0]] == nominal_mass
     assert env.task.model.jnt_range[env.task.index.head_joints[-1], 0] == -.05
     env.close()
     other.close()
@@ -310,3 +293,16 @@ def test_dataset_rejects_group_leakage(tmp_path):
         path.write_text(json.dumps(manifest))
     with pytest.raises(ValueError, match="leaked across splits"):
         dataset_statistics(tmp_path)
+
+
+def test_waypoint_stop_before_grid_action_replays_observation_order(tmp_path, monkeypatch):
+    original = Teacher.act
+    def stop_at_grid(self, obs):
+        command = original(self, obs)
+        self.stop_requested |= np.isclose(obs['time'], .05)
+        return command
+    monkeypatch.setattr(Teacher, 'act', stop_at_grid)
+    run_episode('panda', 0, load_json('configs/collect.json'), tmp_path/'episode', max_episode_s=.12)
+    commands = json.loads((tmp_path/'episode/commands.json').read_text())
+    assert any(c['tick'] == 50 and c['kind'] == 'stop' and not c['after_physics'] for c in commands)
+    assert replay_episode(tmp_path/'episode')['max_observation_error'] == 0

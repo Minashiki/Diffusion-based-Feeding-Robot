@@ -112,7 +112,7 @@ class Diagnostics:
                    phase=task.logic.phase, failure=task.failure_reason, valid=bool(valid),
                    adapter_before=before, adapter_after=self.adapter_state(task),
                    part=teacher.part if teacher else None,
-                   carry_part=teacher.carry_part if teacher else None,
+                   release_part=teacher.release_part if teacher else None,
                    lift_complete=teacher.pickup_lift_complete if teacher else None,
                    target_position=teacher.target_position.copy() if teacher else None,
                    target_rotation=teacher.target_rotation.copy() if teacher else None,
@@ -124,7 +124,7 @@ class Diagnostics:
             return
         snapshot, e = task.snapshot(), evidence(task)
         rotation = snapshot["tcp_rotation"]
-        local = rotation.T @ (e["food_position"] - e["tcp_position"])
+        local = rotation.T @ (e["bean_position"] - e["tcp_position"])
         shaped = task.adapter.velocity.copy()
         base = task.data.site_xmat[task.index.base].reshape(3, 3)
         reference_velocity = np.r_[base @ shaped[:3], base @ shaped[3:]]
@@ -135,9 +135,10 @@ class Diagnostics:
             task.model, mujoco.mjtObj.mjOBJ_JOINT, name)] for name in task.robot_config["joints"]])
         actual_q = snapshot["q"]
         reference_q = task.adapter.reference.q[task.index.qpos].copy()
-        food_geom = mujoco.mj_name2id(task.model, mujoco.mjtObj.mjOBJ_GEOM, "food_box")
-        plate = mujoco.mj_name2id(task.model, mujoco.mjtObj.mjOBJ_SITE, "plate_frame")
-        corners = geom_corners(task.model, task.data, food_geom)
+        bean_geom = int(task.index.bean_collision_geoms[0])
+        bowl = mujoco.mj_name2id(task.model, mujoco.mjtObj.mjOBJ_SITE, "bowl_frame")
+        from feedingrobot.sim.events import ellipsoid_bounds
+        lower, _ = ellipsoid_bounds(task.model, task.data, bean_geom, np.zeros(3), np.eye(3))
         row.update(actual_tcp_position=snapshot["tcp_position"], actual_tcp_rotation=rotation,
                    actual_tcp_twist_world=snapshot["tcp_twist_world"],
                    reference_tcp_twist_world=reference_velocity,
@@ -146,15 +147,15 @@ class Diagnostics:
                        if derivative_valid else None,
                    reference_tcp_acceleration_world=(reference_velocity - previous["reference_velocity"]) / elapsed
                        if derivative_valid else None,
-                   food_position=e["food_position"], food_local=local,
-                   food_local_velocity=(local - previous["local"]) / elapsed if derivative_valid else None,
+                   bean_position=e["bean_position"], bean_local=local,
+                   bean_local_velocity=(local - previous["local"]) / elapsed if derivative_valid else None,
                    pitch_rad=float(np.arcsin(np.clip(-rotation[2, 0], -1., 1.))),
-                   food_min_corner_z_m=float(corners[:, 2].min()),
-                   food_min_corner_plate_height_m=float(corners[:, 2].min() - task.data.site_xpos[plate, 2]),
+                   bean_min_z_m=float(lower[2]),
+                   bean_min_bowl_height_m=float(lower[2] - task.data.site_xpos[bowl, 2]),
                    actual_q=actual_q, reference_q=reference_q,
                    joint_limit_margin=np.minimum(actual_q-ranges[:, 0], ranges[:, 1]-actual_q),
                    reference_joint_limit_margin=np.minimum(reference_q-ranges[:, 0], ranges[:, 1]-reference_q),
-                   supported=e["supported"], on_plate=e["on_plate"], off_plate=e["off_plate"],
+                   supported=e["supported"], on_bowl=e["on_bowl"], off_bowl=e["off_bowl"],
                    food_ground_contact=e["food_ground_contact"], mouth_supported=e["mouth_supported"],
                    at_wait=e["at_wait"], penetration=e["penetration"],
                    event_unsupported_s=task.logic.timers["unsupported"],
@@ -337,6 +338,9 @@ class Observation:
                     phase, before_events = task.logic.phase, len(task.logic.events)
                     if task.tick % action_ticks == 0:
                         command = teacher.act(task.provider.observe()["policy_obs"])
+                        if teacher.stop_requested:
+                            task.adapter.stop(hold_reference=True)
+                            line(actions, dict(tick=task.tick, kind="stop", hold_reference=True))
                         until = (task.tick + action_ticks) * task.dt
                         before = diagnostics.adapter_state(task) if diagnostics else None
                         task.adapter.set_twist(command, task.data.time, until)
@@ -344,7 +348,7 @@ class Observation:
                             diagnostics.command(task, "twist", before, command_time=float(task.data.time), valid_until=until)
                         line(actions, dict(tick=task.tick, time=float(task.data.time), kind="twist",
                                            command=command, valid_until=until, part=teacher.part,
-                                           carry_part=teacher.carry_part, target_position=teacher.target_position,
+                                           release_part=teacher.release_part, target_position=teacher.target_position,
                                            target_rotation=teacher.target_rotation))
                     before = diagnostics.adapter_state(task) if diagnostics else None
                     snapshot = task.step_physics()

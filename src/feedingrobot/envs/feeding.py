@@ -16,6 +16,21 @@ EXECUTION_STATES = ("idle", "active", "expired", "stopped", "success", "blocked"
                     "withdrawal_before_release", "food_missing")
 
 
+def observation_schema(robot_id, n):
+    fields = [("q", n, "rad"), ("dq", n, "rad/s"), ("tcp_position", 3, "m"),
+              ("tcp_rotation", 9, "rotation matrix row-major"), ("tcp_twist_world", 6, "m/s, rad/s"),
+              ("bean_relative_world", 3, "m"), ("mouth_relative_world", 3, "m"),
+              ("mouth_rotation", 9, "rotation matrix row-major"), ("mouth_aperture_m", 1, "m"),
+              ("raw_wrench_sensor", 6, "N, Nm"), ("wrench_world_at_tcp", 6, "N, Nm"),
+              ("compensated_wrench", 6, "N, Nm"), ("stage", len(PHASES), "one-hot"),
+              ("interaction", 4, "boolean"), ("execution_status", len(EXECUTION_STATES), "one-hot"),
+              ("frame_age_s", 1, "s"), ("receiver_relative_world", 3, "m"),
+              ("receiver_rotation", 9, "rotation matrix row-major")]
+    return dict(version=3, robot_id=robot_id, fields=fields, phases=PHASES,
+                execution_states=EXECUTION_STATES,
+                interaction=("spoon_support", "mouth_support", "tool_mouth_contact", "ready"))
+
+
 class FeedingGymEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 50}
 
@@ -34,18 +49,9 @@ class FeedingGymEnv(gym.Env):
             raise ValueError("Episode time limit must be finite and positive")
         self.action_space = gym.spaces.Box(-1., 1., (6,), dtype=np.float32)
         n = self.task.index.n
-        self.fields = [("q", n, "rad"), ("dq", n, "rad/s"), ("tcp_position", 3, "m"),
-                       ("tcp_rotation", 9, "rotation matrix row-major"), ("tcp_twist_world", 6, "m/s, rad/s"),
-                       ("bean_relative_world", 3, "m"), ("mouth_relative_world", 3, "m"),
-                       ("mouth_rotation", 9, "rotation matrix row-major"), ("mouth_aperture_m", 1, "m"),
-                       ("raw_wrench_sensor", 6, "N, Nm"), ("wrench_world_at_tcp", 6, "N, Nm"),
-                       ("compensated_wrench", 6, "N, Nm"), ("stage", len(PHASES), "one-hot"),
-                       ("interaction", 4, "boolean"), ("execution_status", len(EXECUTION_STATES), "one-hot"),
-                       ("frame_age_s", 1, "s")]
+        self.schema = observation_schema(robot_id, n)
+        self.fields = self.schema['fields']
         self.observation_space = gym.spaces.Box(-np.inf, np.inf, (sum(f[1] for f in self.fields),), dtype=np.float32)
-        self.schema = dict(version=2, robot_id=robot_id, fields=self.fields, phases=PHASES,
-                           execution_states=EXECUTION_STATES,
-                           interaction=("spoon_support", "mouth_support", "tool_mouth_contact", "ready"))
         self.viewer_context = self.viewer = None
         self.done = True
         self.steps = 0
@@ -162,14 +168,15 @@ class FeedingGymEnv(gym.Env):
         return obs, float(sum(terms.values())), terminated, truncated, info
 
     def get_state(self):
-        return copy.deepcopy(dict(schema_version=2, task=self.task.get_state(), steps=self.steps, done=self.done,
+        return copy.deepcopy(dict(schema_version=3, observation_schema=copy.deepcopy(self.schema), task=self.task.get_state(), steps=self.steps, done=self.done,
                                   max_episode_s=self.max_episode_s, last_observation=self.last_observation,
                                   step_metrics=self.step_metrics, rng_seed=self.np_random_seed,
                                   rng=self.np_random.bit_generator.state,
                                   action_rng=self.action_space.np_random.bit_generator.state))
 
     def set_state(self, state):
-        if state["schema_version"] != 2 or state["max_episode_s"] != self.max_episode_s:
+        if (state["schema_version"] != 3 or state.get("observation_schema") != self.schema
+                or state["max_episode_s"] != self.max_episode_s):
             raise ValueError("Incompatible environment snapshot")
         self.task.set_state(state["task"])
         self.steps, self.done = state["steps"], state["done"]

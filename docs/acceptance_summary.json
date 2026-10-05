@@ -238,7 +238,8 @@
         "local_15_bean_motion": "failed",
         "related_tests_passed": 129,
         "m1b_report": "outputs/beans_native/v1/m1/contact_fix_candidate_v4/m1b_regression.json",
-        "contact_report": "docs/m1d_single_bean_contact_fix.md",
+        "contact_report": null,
+        "legacy_cleanup": "Old-food diagnostic report removed; current single-bean freezes retained",
         "freeze_manifest": null
       }
     }

@@ -10,7 +10,7 @@ def validate_scenario(scenario):
     if scenario is not None and not isinstance(scenario, dict):
         raise ValueError("Scenario must be a parameter dictionary")
     scenario = copy.deepcopy(scenario or {})
-    ranges = {"food_mass_kg": (.001, .01), "food_friction": (.05, .8),
+    ranges = {"recover_departure_m": (0., .015), "food_mass_kg": (.001, .01), "food_friction": (.05, .8),
               "head_amp_m": (0., .012), "head_freq_hz": (0., .3),
               "head_phase_rad": (-np.pi, np.pi)}
     vectors = {"food_offset_m": (2, .01), "head_offset_m": (3, .005)}

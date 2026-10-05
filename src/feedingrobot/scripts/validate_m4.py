@@ -1,4 +1,4 @@
-"""Frozen new-tableware teacher, physical replay, convergence and data gates."""
+"""Frozen single-bean teacher, physical replay, convergence and data gates."""
 
 import argparse
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -6,6 +6,7 @@ from collections import Counter
 import json
 import multiprocessing
 import os
+import pickle
 import subprocess
 import sys
 import traceback
@@ -14,13 +15,14 @@ import numpy as np
 
 from feedingrobot.data.episodes import input_hashes, load_episode, write_json
 from feedingrobot.data.recipes import recipe
-from feedingrobot.data.replay import replay_episode
+from feedingrobot.data.replay import replay_many
 from feedingrobot.data.rollout import run_episode
 from feedingrobot.envs import FeedingGymEnv
 from feedingrobot.experts import Teacher
 from feedingrobot.experts.geometry import teacher_geometry
 from feedingrobot.experts.gate import PRECOLLECTION_CASES, local_teacher_passed, matching_teachers_passed
 from feedingrobot.experts.feasibility import check_waypoints
+from feedingrobot.experts.freeze import freeze_inputs, parent_m3_check, publish_acceptance
 from feedingrobot.scripts.collect import dataset_statistics
 from feedingrobot.sim.model import ROOT, load_json
 
@@ -32,7 +34,7 @@ def physical_success(result):
         return False
     rows = {row["event"]["name"]: row for row in result["evidence"]}
     assert set(rows) == {"pickup", "delivery", "success"}
-    assert rows["pickup"]["supported"] and rows["pickup"]["off_plate"] and not rows["pickup"]["on_plate"]
+    assert rows["pickup"]["supported"] and rows["pickup"]["off_bowl"] and not rows["pickup"]["on_bowl"]
     assert rows["delivery"]["mouth_supported"] and rows["delivery"]["released"] and not rows["delivery"]["supported"]
     assert rows["success"]["mouth_supported"] and rows["success"]["released"]
     assert not rows["success"]["tool_inside"] and not rows["success"]["tool_mouth_contact"]
@@ -50,12 +52,12 @@ def saved_or_run(robot, config, path, seed, scenario, parameters, group, *, spli
                        split=split, group_id=group, **kwargs)
 
 
-def acceptance_trial(robot, config, output, index, recover=False, viewer=False):
-    seed, scenario, parameters, group = recipe(config, "acceptance", index, recover=recover)
+def acceptance_trial(robot, config, output, index, recover=False, viewer=False, recipe_config=None):
+    seed, scenario, parameters, group = recipe(recipe_config or config, "acceptance", index, recover=recover)
     path = output / "episodes" / f"{'recovery' if recover else 'normal'}_{seed}"
     result = saved_or_run(robot, config, path, seed, scenario, parameters, group, viewer=viewer)
     complete = physical_success(result)
-    recovered = any(s["recovery_valid"] for s in result["segments"])
+    recovered = result["accepted_recovery"]
     summary = {key: result[key] for key in ("seed", "success", "failure_reason", "truncated", "time_s",
                                            "contact_peak_n", "contact_impulse_ns", "wrist_peak_n")}
     summary.update(success=bool(complete and (not recover or recovered)), recovery_completed=recovered,
@@ -93,89 +95,125 @@ def convergence_cases(config):
             for recover in (False, True) for i in range(5)]
 
 
-def calibration(config, output, *, viewer=False):
-    """Calibrate only on training-fold scenes, stop on the first failed step."""
-    results = []
-    for mode, count in (("fixed",3),("static",10),("dynamic",10),("recovery",10)):
-        for index in range(count):
-            if mode == "fixed":
-                seed, parameters, group = 0, {}, "fixed-calibration"
-                scenario = dict(config["scene"], food_offset_m=[0.,0.], head_freq_hz=0., head_phase_rad=0.)
-            else:
-                seed, scenario, parameters, group = recipe(config,"calibration",index,recover=mode=="recovery")
-                if mode == "static":
-                    scenario.update(head_freq_hz=0.,head_phase_rad=0.)
-            path = output/"calibration"/f"{mode}_{index}"
-            result = saved_or_run("panda",config,path,seed,scenario,parameters,group,
-                                  split="calibration",viewer=viewer and index==0)
-            complete = physical_success(result)
-            if mode == "recovery":
-                complete &= any(s["recovery_valid"] for s in result["segments"])
-            milestones = [e["name"] for e in result["events"] if e["name"] in ("pickup","delivery","success")]
-            results.append(dict(mode=mode,index=index,episode=str(path),success=bool(complete),
-                                milestones=milestones,failure_reason=result["failure_reason"]))
-            write_json(output/"calibration_progress.json",results)
-            if not complete:
-                failed_step = ("pickup" if "pickup" not in milestones else "transport"
-                               if not any(e.get("phase")=="WAIT_READY" for e in result["events"])
-                               else "delivery_retract_recovery")
-                return dict(status="failed",failed_step=failed_step,trials=results,
-                            reason="Calibration failed; later steps and independent acceptance are prohibited")
-    return dict(status="passed",trials=results,fixed_repeats=3,independent_static=10,
-                dynamic=10,recovery=10)
+def calibration_trial(config, output, mode, index, viewer=False):
+    if mode == "fixed":
+        seed, parameters, group = 0, {}, "fixed-calibration"
+        scenario = dict(config["scene"], head_freq_hz=0., head_phase_rad=0.)
+    else:
+        seed, scenario, parameters, group = recipe(config, "calibration", index, recover=mode == "recovery")
+        if mode == "static":
+            scenario.update(head_freq_hz=0., head_phase_rad=0.)
+    path = output / "calibration" / f"{mode}_{index}"
+    result = saved_or_run("panda", config, path, seed, scenario, parameters, group,
+                          split="calibration", viewer=viewer)
+    complete = physical_success(result)
+    if mode == "recovery":
+        complete &= result["accepted_recovery"]
+    milestones = [e["name"] for e in result["events"] if e["name"] in ("pickup", "delivery", "success")]
+    failed_step = ("pickup" if "pickup" not in milestones else "transport"
+                   if not any(e.get("phase") == "WAIT_READY" for e in result["events"])
+                   else "delivery_retract_recovery")
+    return dict(mode=mode, index=index, episode=str(path), success=bool(complete),
+                pickup_settled=result["pickup_settled"], milestones=milestones,
+                failure_reason=result["failure_reason"], failed_step=None if complete else failed_step)
 
 
-def convergence(robot, config, output):
-    tolerances = load_json("configs/acceptance_m3.json")
+def calibration(config, output, *, viewer=False, workers=1):
+    """The four calibration gates run sequentially, with independent trials within each gate."""
     results = []
-    for item in convergence_cases(config):
-        seed, scenario, parameters, group = recipe(config, "acceptance", item["index"], recover=item["recover"])
-        path = output / "episodes" / f"{'recovery' if item['recover'] else 'normal'}_{seed}"
-        original, original_arrays = load_episode(path)
-        assert physical_success(original), "A preassigned convergence baseline failed; cannot substitute another seed"
-        base_iterations = original["solver_iterations"]
-        base_tolerance = original["solver_tolerance"]
-        for name, dt, iterations, tolerance in (("half_dt", original["dt"]/2, base_iterations, base_tolerance),
-                ("refined_solver", original["dt"], base_iterations*2, base_tolerance/10)):
-            fine_path = output / "convergence" / f"{seed}_{name}"
-            fine = saved_or_run(robot, config, fine_path, seed, scenario, parameters, group,
-                               timestep=dt, iterations=iterations, solver_tolerance=tolerance)
-            assert physical_success(fine), fine["failure_reason"]
-            names = ("pickup", "delivery", "success", "phase")
-            old_events = [e for e in original["events"] if e["name"] in names]
-            new_events = [e for e in fine["events"] if e["name"] in names]
-            assert [{k:v for k,v in e.items() if k!='time'} for e in old_events] == [
-                {k:v for k,v in e.items() if k!='time'} for e in new_events], "Event sequence differs"
-            event_error = max(abs(a["time"]-b["time"]) for a,b in zip(old_events,new_events))
-            assert event_error <= tolerances["event_time_tolerance_s"], event_error
-            for key, absolute, relative in (("contact_peak_n", "force_absolute_tolerance_n", "force_relative_tolerance"),
-                                            ("wrist_peak_n", "force_absolute_tolerance_n", "force_relative_tolerance"),
-                                            ("contact_impulse_ns", "impulse_absolute_tolerance_ns", "impulse_relative_tolerance")):
-                assert abs(original[key]-fine[key]) <= max(tolerances[absolute], tolerances[relative]*original[key]), key
-            tcp_error = max(float(np.linalg.norm(np.asarray(a["tcp_position"])-b["tcp_position"]))
-                            for a,b in zip(original["evidence"],fine["evidence"]))
-            assert tcp_error <= tolerances["tcp_position_tolerance_m"], tcp_error
-            for field, absolute, relative in (("contact_group_peaks_n", "force_absolute_tolerance_n", "force_relative_tolerance"),
-                                             ("contact_group_impulses_ns", "impulse_absolute_tolerance_ns", "impulse_relative_tolerance")):
-                for group in original[field].keys() | fine[field].keys():
-                    old, new = original[field].get(group,0.), fine[field].get(group,0.)
-                    assert abs(old-new) <= max(tolerances[absolute], tolerances[relative]*old), (field,group,old,new)
-            _, fine_arrays = load_episode(fine_path)
-            old_ticks, new_ticks = original_arrays["observation_ticks"], fine_arrays["observation_ticks"]
-            old_grid = old_ticks % round(.02/original["dt"]) == 0
-            new_grid = new_ticks % round(.02/fine["dt"]) == 0
-            # TCP follows q/dq in the unchanged Gym observation schema.
-            offset = 2*original["observation_schema"]["fields"][0][1]
-            old_path = original_arrays["observations"][old_grid, offset:offset+3]
-            new_path = fine_arrays["observations"][new_grid, offset:offset+3]
-            length = min(len(old_path),len(new_path))
-            path_error = float(np.max(np.linalg.norm(old_path[:length]-new_path[:length],axis=1)))
-            assert path_error <= tolerances["tcp_position_tolerance_m"], path_error
-            if item["recover"]:
-                assert any(s["recovery_valid"] for s in fine["segments"])
-            results.append(dict(seed=seed, recover=item["recover"], variant=name, event_error_s=event_error,
-                                tcp_error_m=tcp_error, path_error_m=path_error, iterations=iterations, solver_tolerance=tolerance))
-    return dict(status="passed", trials=results, criteria=tolerances)
+    for mode, count in (("fixed", 3), ("static", 10), ("dynamic", 10), ("recovery", 10)):
+        with ProcessPoolExecutor(max_workers=min(count, workers), mp_context=multiprocessing.get_context("spawn")) as executor:
+            futures = [executor.submit(calibration_trial, config, output, mode, i, viewer and i == 0)
+                       for i in range(count)]
+            step = []
+            for future in as_completed(futures):
+                result = future.result()
+                step.append(result)
+                write_json(output / "calibration_progress.json", results + step)
+                print(f"calibration {mode} {len(step)}/{count}: success={result['success']}", flush=True)
+        results += sorted(step, key=lambda r: r["index"])
+        failed = next((r for r in step if not r["success"]), None)
+        if failed:
+            return dict(status="failed", failed_step=failed["failed_step"], trials=results,
+                        reason="Calibration failed; later steps and independent acceptance are prohibited")
+    return dict(status="passed", trials=results, fixed_repeats=3, independent_static=10,
+                dynamic=10, recovery=10)
+
+
+def convergence_trial(robot, config, output, item, recipe_config=None):
+    tolerances = load_json("configs/acceptance_m4.json")
+    results = []
+    seed, scenario, parameters, group = recipe(recipe_config or config, "acceptance", item["index"], recover=item["recover"])
+    path = output / "episodes" / f"{'recovery' if item['recover'] else 'normal'}_{seed}"
+    original, _ = load_episode(path)
+    initial_state = pickle.loads((path / "initial_state.pkl").read_bytes())
+    base_success = physical_success(original)
+    base_iterations = original["solver_iterations"]
+    base_tolerance = original["solver_tolerance"]
+    for name, dt, iterations, tolerance in (("half_dt", original["dt"]/2, base_iterations, base_tolerance),
+            ("refined_solver", original["dt"], base_iterations*2, base_tolerance/10)):
+        fine_path = output / "convergence" / f"{seed}_{name}"
+        fine = saved_or_run(robot, config, fine_path, seed, scenario, parameters, group,
+                           timestep=dt, iterations=iterations, solver_tolerance=tolerance, initial_state=initial_state)
+        fine_success = physical_success(fine)
+        from feedingrobot.scripts.validate_m3 import compare_runs
+        def comparison_run(manifest):
+            return dict(manifest["comparison"], events=manifest["events"], success=manifest["success"],
+                        failure_reason=manifest["failure_reason"], phase=manifest["phase"],
+                        time=manifest["time_s"], scenario="m4_full",
+                        peak_force_n=manifest["contact_peak_n"], impulse_ns=manifest["contact_impulse_ns"],
+                        contact_pair_peaks_n=manifest["contact_group_peaks_n"],
+                        contact_pair_impulses_ns=manifest["contact_group_impulses_ns"])
+        comparison = compare_runs(comparison_run(original), comparison_run(fine), tolerances)
+        wrist_error = abs(original["wrist_peak_n"]-fine["wrist_peak_n"])
+        comparison["checks"]["wrist_peak_n"] = wrist_error <= max(
+            tolerances["force_absolute_tolerance_n"], tolerances["force_relative_tolerance"]*original["wrist_peak_n"])
+        comparison["checks"]["physical_success"] = base_success and fine_success and (not item["recover"] or fine["accepted_recovery"])
+        comparison["passed"] = all(comparison["checks"].values())
+        results.append(dict(seed=seed, recover=item["recover"], variant=name, comparison=comparison,
+                            iterations=iterations, solver_tolerance=tolerance))
+    return results
+
+
+def convergence(robot, config, output, workers=1, recipe_config=None):
+    completed = {}
+    cases = convergence_cases(recipe_config or config)
+    with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("spawn")) as pool:
+        futures = {pool.submit(convergence_trial, robot, config, output, item, recipe_config): i for i, item in enumerate(cases)}
+        for future in as_completed(futures):
+            completed[futures[future]] = future.result()
+            write_json(output / "convergence_progress.json", [r for i in sorted(completed) for r in completed[i]])
+            print(f"{robot} convergence {len(completed)}/{len(cases)}", flush=True)
+    results = [r for i in sorted(completed) for r in completed[i]]
+    return dict(status="passed" if all(r["comparison"]["passed"] for r in results) else "failed",
+                trials=results, criteria=load_json("configs/acceptance_m4.json"))
+
+def prior_revision(robot, config, output, workers):
+    from feedingrobot.experts.freeze import sha256
+    directory = ROOT / config['prior_acceptance']['directory']
+    assert sha256(directory / 'freeze_manifest.json') == config['prior_acceptance']['manifest_sha256']
+    old_manifest = json.loads((directory / 'freeze_manifest.json').read_text())
+    old_config_path = directory / 'frozen_inputs/configs/collect.json'
+    assert sha256(old_config_path) == old_manifest['input_sha256']['configs/collect.json']
+    old_config = json.loads(old_config_path.read_text())
+    folder = output / 'prior_revision'
+    folder.mkdir(parents=True, exist_ok=True)
+    cases = convergence_cases(old_config)
+    completed = {}
+    with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context('spawn')) as pool:
+        futures = {pool.submit(acceptance_trial, robot, config, folder, c['index'], c['recover'], False, old_config): i
+                   for i, c in enumerate(cases)}
+        for future in as_completed(futures):
+            completed[futures[future]] = future.result()
+            write_json(folder / 'baseline_progress.json', [completed[i] for i in sorted(completed)])
+            print(f'{robot} prior revision {len(completed)}/10', flush=True)
+    numerical = convergence(robot, config, folder, workers, old_config)
+    replays = replay_many([p.parent for p in sorted(folder.glob('*/*/manifest.json'))], workers=workers,
+                          progress=folder / 'replay_progress.json')
+    results = [completed[i] for i in sorted(completed)]
+    return dict(status='passed' if all(r['success'] for r in results) and numerical['status']=='passed' else 'failed',
+                prior_manifest_sha256=config['prior_acceptance']['manifest_sha256'],
+                cases=cases, baseline=results, convergence=numerical, replays=replays)
 
 
 def run_logged(command, path, timeout=None):
@@ -191,7 +229,7 @@ def update_gate(report, companion):
     report["teacher_gate"] = "passed" if passed else "not_verified"
     if passed:
         report["compatibility"] = {k: companion[k] for k in
-            ("robot_id", "cases", "baseline", "recovery_baseline", "input_hashes", "teacher_config")}
+            ("robot_id", "cases", "baseline", "recovery_baseline", "input_hashes", "teacher_config", "parent_m3")}
     else:
         report.pop("compatibility", None)
     return passed
@@ -212,7 +250,7 @@ def main():
     if args.workers < 1 or (args.trials is not None and args.trials < 1):
         parser.error("--trials and --workers must be positive")
     config = json.loads((ROOT / args.config).read_text())
-    output = ROOT / (args.output or f"outputs/new_tableware/v3/m4/{args.robot}")
+    output = ROOT / (args.output or f"outputs/single_bean/v1/m4/revision_3/{args.robot}")
     output.mkdir(parents=True, exist_ok=True)
     report_path = output / "report.json"
     companion_path = ROOT / args.companion_report if args.companion_report else output.parent / (
@@ -221,10 +259,18 @@ def main():
     if report and (report.get("input_hashes") != input_hashes() or report.get("teacher_config") != config):
         raise ValueError("Report belongs to different source/teacher; use a new --output")
     report.update(robot_id=args.robot, teacher_config=config, input_hashes=input_hashes(),
-                  scope="P0 new-tableware teacher/data; no learned policies", status="incomplete", teacher_gate="not_verified")
+                  scope="Single-bean M4 independent policy-observation teacher acceptance; no learned policies", status="incomplete", teacher_gate="not_verified")
     report.setdefault("cases", {name: dict(status="not_verified") for name in CASES})
     report["convergence_cases"] = convergence_cases(config)
     selected = args.cases or CASES
+    report['parent_m3'] = parent_m3_check()
+    if any(name in selected for name in ('teacher', 'recovery', 'convergence')):
+        if config.get('teacher_status') != 'frozen':
+            raise ValueError('Calibrate and freeze the teacher before independent acceptance')
+        seeds = {robot: dict(normal=[recipe(config, 'acceptance', i)[0] for i in range(100 if robot == 'panda' else 5)],
+                            recovery=[recipe(config, 'acceptance', i, recover=True)[0] for i in range(10 if robot == 'panda' else 5)],
+                            convergence=convergence_cases(config)) for robot in ('panda', 'ur5e')}
+        freeze_inputs(output.parent, config, seeds)
     for name in selected:
         write_json(report_path, report)
         try:
@@ -237,11 +283,11 @@ def main():
                     teacher.reset({}, geometry=teacher_geometry(task))
                     obs = task.provider.observe()["policy_obs"]
                     teacher.act(obs)
-                    r, points = teacher.acquisition_waypoints(obs)
+                    points = teacher.acquisition_waypoints(obs)
                     mp = obs["tcp_position"]+obs["mouth_relative_world"]
                     mr = obs["mouth_rotation"]
                     before = task.get_state()["physics"]
-                    checks = check_waypoints(task, [(f"acquire_{i}",point,r) for i,point in enumerate(points)] + [
+                    checks = check_waypoints(task, points + [
                         ("wait",mp-mr[:,0]*task.task_config["wait_offset_m"],mr),
                         ("insert",mp+mr@np.array([config["teacher"]["insert_depth_m"],0.,config["teacher"]["insert_height_m"]]),mr)])
                     np.testing.assert_array_equal(before, task.get_state()["physics"])
@@ -254,7 +300,7 @@ def main():
                 elif args.robot == "ur5e":
                     result = dict(status="passed",scope="Compatibility checked by five normal and five recovery full episodes")
                 else:
-                    result = calibration(config,output,viewer=not args.headless)
+                    result = calibration(config,output,viewer=not args.headless, workers=args.workers)
             elif name in ("teacher", "recovery"):
                 if any(report["cases"][k]["status"] != "passed" for k in ("feasibility","calibration")):
                     report["cases"][name] = dict(status="not_verified",reason="Calibration has not passed")
@@ -266,9 +312,14 @@ def main():
                 report["recovery_baseline" if recover else "baseline"] = result
             elif name == "convergence":
                 if all(report["cases"][k]["status"] == "passed" for k in ("teacher", "recovery")):
-                    result = convergence(args.robot, config, output)
+                    result = convergence(args.robot, config, output, args.workers)
                 else:
                     result = dict(status="not_verified", reason="Normal and recovery baselines must pass")
+            elif name == "prior_revision":
+                if all(report["cases"][k]["status"] == "passed" for k in ("teacher", "recovery", "convergence")):
+                    result = prior_revision(args.robot, config, output, args.workers)
+                else:
+                    result = dict(status="not_verified", reason="Independent numerical acceptance must pass first")
             elif name == "replay":
                 paths = (sorted((output / "episodes").glob("*/manifest.json"))
                          + sorted((output / "convergence").glob("*/manifest.json"))
@@ -276,10 +327,8 @@ def main():
                 expected = sum(report.get(k, {}).get("attempts", 0) for k in ("baseline", "recovery_baseline"))
                 if not expected or len(list((output/"episodes").glob("*/manifest.json"))) != expected:
                     raise ValueError("Incomplete baseline episode coverage")
-                results = []
-                for path in paths:
-                    results.append(replay_episode(path.parent))
-                    write_json(output / "replay_progress.json", results)
+                results = replay_many([path.parent for path in paths], workers=args.workers,
+                                      progress=output / 'replay_progress.json')
                 result = dict(status="passed", episodes=results)
             elif name == "viewer":
                 if not os.environ.get("DISPLAY"):
@@ -306,10 +355,13 @@ def main():
                 elif not matching_teachers_passed(report, companion):
                     result = dict(status="not_verified", reason="Both teachers require all precollection checks")
                 else:
-                    directory = ROOT / (args.dataset or "datasets/new_tableware/v3/m4/panda")
-                    stats = dataset_statistics(directory, config=config, robot=args.robot, replay=True)
+                    directory = ROOT / (args.dataset or "datasets/single_bean/v1/m4/panda")
+                    stats = dataset_statistics(directory, config=config, robot=args.robot, replay=True, workers=args.workers)
                     passed = stats["replay_status"] == "passed" and all(stats["counts"].get(s,0)>=n
                         and stats["recovery_counts"].get(s,0)>=n for s,n in config["quotas"].items())
+                    if passed:
+                        stats["status"] = "passed"
+                        write_json(directory / "statistics.json", stats)
                     result = dict(status="passed" if passed else "incomplete", statistics=stats)
             report["cases"][name] = result
         except Exception as exc:
@@ -324,6 +376,8 @@ def main():
     report["status"] = ("passed" if report["teacher_gate"] == "passed" and all(s=="passed" for s in statuses)
                         else "failed" if "failed" in statuses else "incomplete")
     write_json(report_path, report)
+    if report["status"] == "passed" and companion.get("status") == "passed":
+        publish_acceptance(output.parent, config, ROOT / (args.dataset or "datasets/single_bean/v1/m4/panda"))
     print(f"M4 {args.robot}: {report['status']}; teacher gate: {report['teacher_gate']}")
     return 0 if report["status"] == "passed" else 1
 

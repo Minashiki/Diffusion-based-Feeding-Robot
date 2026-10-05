@@ -260,7 +260,10 @@ class FeedingTask:
         desired[4] += cfg["jaw_center_rad"]
         velocity = amplitude * w * np.cos(w * t + phase)
         if scenario.get("recover", False) and self.logic and self.logic.phase == "APPROACH":
-            if self.scenario_state["closure_start"] is None:
+            mouth = self.model.site('mouth_entry').id
+            wait = self.data.site_xpos[mouth]-self.data.site_xmat[mouth].reshape(3, 3)[:, 0]*self.task_config['wait_offset_m']
+            departed = np.linalg.norm(self.data.site_xpos[self.index.tcp]-wait) >= scenario.get('recover_departure_m', 0.)
+            if self.scenario_state["closure_start"] is None and departed:
                 self.scenario_state["closure_start"] = t
                 self.scenario_state["future_events"].append(dict(name="jaw_closure", time=t))
         start = self.scenario_state["closure_start"]
@@ -380,7 +383,10 @@ class StateProvider:
                    current_tool_contact=any("spoon" in [r["group1"], r["group2"]] for r in task.contacts))
         if task.task_mode:
             e = evidence(task)
-            obs.update(stage=task.logic.phase, mouth_rotation=e["mouth_rotation"], mouth_aperture_m=e["aperture_m"],
+            receiver = named_id(task.model, mujoco.mjtObj.mjOBJ_SITE, "mouth_receiver")
+            obs.update(receiver_relative_world=task.data.site_xpos[receiver].copy()-tcp,
+                       receiver_rotation=task.data.site_xmat[receiver].reshape(3, 3).copy(),
+                       stage=task.logic.phase, mouth_rotation=e["mouth_rotation"], mouth_aperture_m=e["aperture_m"],
                        interaction=np.array([e[k] for k in ("supported", "mouth_supported", "tool_mouth_contact", "ready")],
                                             dtype=np.float32))
         return dict(policy_obs=obs,

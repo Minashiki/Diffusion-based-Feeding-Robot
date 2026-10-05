@@ -15,92 +15,58 @@ from feedingrobot.sim.model import load_json
 from feedingrobot.sim.observer_viewer import ObserverViewer
 
 
-def test_loaded_spoon_tilts_only_after_pickup_and_clearance():
+def test_loaded_spoon_tilts_only_after_pickup_and_seating():
     env = FeedingGymEnv()
     env.reset(seed=0)
     teacher = Teacher(env.task.robot_config, load_json("configs/collect.json"))
-    teacher.reset({"carry_pitch_rad": -.2}, geometry=teacher_geometry(env.task))
+    teacher.reset({"carry_pitch_rad": -.02}, geometry=teacher_geometry(env.task))
     obs = env.task.provider.observe()["policy_obs"]
-    teacher.act(obs)
-    teacher.capture_roll_complete = True
-    teacher.part = 4  # Isolate the controller; this is not physical pickup evidence.
-    teacher.capture_position = obs["tcp_position"].copy()
-    obs["tcp_position"] = obs["tcp_position"].copy()
-    obs["tcp_position"][2] = .06
-    obs["stage"] = "ACQUIRE"
-    teacher.act(obs)
-    scoop_rotation = teacher.target_rotation.copy()
-    assert teacher.carry_part == 0
     obs["stage"] = "TRANSPORT"
-    obs["tcp_position"][2] = teacher.geometry["plate_position"][2] + teacher.parameters["tilt_clearance_m"] - .001
+    teacher.part = 8
     teacher.act(obs)
-    np.testing.assert_array_equal(teacher.target_rotation, scoop_rotation)
-    obs["tcp_position"][2] += .002
-    teacher.act(obs)
-    loaded_rotation = teacher.target_rotation.copy()
-    assert teacher.carry_part == 1
-    assert np.linalg.norm(mink.SO3.from_matrix(loaded_rotation @ scoop_rotation.T).log()) > .05
-    obs["tcp_position"][2] -= .002
-    teacher.act(obs)
-    np.testing.assert_array_equal(teacher.target_rotation, loaded_rotation)
-    np.testing.assert_allclose(teacher.target_position[2], teacher.geometry["plate_position"][2] + teacher.parameters["lift_clearance_m"], atol=1e-12)
-    env.close()
-
-
-def test_supported_pickup_continues_roll_before_transport():
-    env = FeedingGymEnv()
-    env.reset(seed=0)
-    teacher = Teacher(env.task.robot_config, load_json("configs/collect.json"))
-    teacher.reset({}, geometry=teacher_geometry(env.task))
-    obs = env.task.provider.observe()["policy_obs"]
-    teacher.act(obs)
-    teacher.part = 3
-    obs["tcp_position"] = np.array([.483, -.187, .0134])
-    obs["stage"] = "TRANSPORT"
-    obs["interaction"] = np.array([1., 0., 0., 0.])
-    obs["food_relative_world"] = np.array([.02, 0., .006])
-    command = teacher.act(obs)
-    assert teacher.part == 4
-    assert not teacher.capture_roll_complete and not teacher.pickup_lift_complete
-    np.testing.assert_array_equal(teacher.capture_position, obs["tcp_position"])
-    assert np.linalg.norm(command[:3]) <= teacher.parameters["linear_speed_m_s"] + 1e-12
-    env.close()
-
-
-def test_transport_segments_do_not_reverse_or_follow_tcp_drift():
-    env = FeedingGymEnv()
-    env.reset(seed=0)
-    teacher = Teacher(env.task.robot_config, load_json("configs/collect.json"))
-    teacher.reset({}, geometry=teacher_geometry(env.task))
-    obs = env.task.provider.observe()["policy_obs"]
-    teacher.act(obs)
+    np.testing.assert_array_equal(teacher.target_rotation, teacher.path[8][2])
+    teacher.part = len(teacher.path)
     teacher.pickup_lift_complete = True
-    obs["stage"] = "TRANSPORT"
-    obs["interaction"] = np.array([1., 0., 0., 0.])
     teacher.act(obs)
-    height_target, loaded_rotation = teacher.target_position.copy(), teacher.target_rotation.copy()
-    assert teacher.carry_part == 2
-    obs["tcp_position"] = obs["tcp_position"] + np.array([.003, -.002, .01])
-    teacher.act(obs)
-    np.testing.assert_array_equal(teacher.target_position, height_target)
-    np.testing.assert_array_equal(teacher.target_rotation, loaded_rotation)
-    obs["tcp_position"], obs["tcp_rotation"] = height_target.copy(), loaded_rotation.copy()
-    obs["food_relative_world"] = loaded_rotation @ np.array([.022, 0., .006])
-    teacher.act(obs)
-    assert teacher.carry_part == 2
-    obs["food_relative_world"] = loaded_rotation @ np.array([.005, 0., .006])
-    teacher.act(obs)
-    assert teacher.carry_part == 3
-    obs["tcp_position"][2] -= .02
-    obs["food_relative_world"] = obs["tcp_rotation"] @ np.array([.022, 0., .006])
-    mouth = obs["tcp_position"] + obs["mouth_relative_world"]
-    teacher.act(obs)
-    assert teacher.carry_part == 3
-    np.testing.assert_allclose(teacher.target_position,
-                               mouth - obs["mouth_rotation"][:, 0] * teacher.geometry["task_config"]["wait_offset_m"])
-    np.testing.assert_array_equal(teacher.target_rotation, obs["mouth_rotation"])
+    assert np.linalg.norm(mink.SO3.from_matrix(teacher.target_rotation @ obs["mouth_rotation"].T).log()) == pytest.approx(.02)
+    env.close()
+
+
+def test_supported_pickup_continues_seating_before_transport():
+    env = FeedingGymEnv()
+    env.reset(seed=0)
+    teacher = Teacher(env.task.robot_config, load_json("configs/collect.json"))
     teacher.reset({}, geometry=teacher_geometry(env.task))
-    assert teacher.carry_part == 0 and teacher.carry_position is None
+    obs = env.task.provider.observe()["policy_obs"]
+    obs["stage"] = "TRANSPORT"
+    obs["interaction"][0] = 1.
+    teacher.part = 10
+    teacher.act(obs)
+    assert teacher.stage == "wall_seat_tip" and not teacher.pickup_lift_complete
+    env.close()
+
+
+def test_transport_levels_before_entry_and_reset_clears_progress():
+    env = FeedingGymEnv()
+    env.reset(seed=0)
+    teacher = Teacher(env.task.robot_config, load_json("configs/collect.json"))
+    teacher.reset({}, geometry=teacher_geometry(env.task))
+    obs = env.task.provider.observe()["policy_obs"]
+    teacher.part = len(teacher.path)
+    teacher.pickup_lift_complete = True
+    obs["stage"] = "APPROACH"
+    teacher.act(obs)
+    assert teacher.stage == "wait_level"
+    mouth = obs["tcp_position"]+obs["mouth_relative_world"]
+    obs["tcp_position"] = teacher.target_position.copy()
+    obs["mouth_relative_world"] = mouth-obs["tcp_position"]
+    obs["tcp_rotation"] = teacher.target_rotation.copy()
+    teacher.act(obs)
+    assert teacher.wait_level_complete
+    teacher.act(obs)
+    assert teacher.stage == "entry"
+    teacher.reset({}, geometry=teacher_geometry(env.task))
+    assert not teacher.wait_level_complete and teacher.part == teacher.release_part == 0
     env.close()
 
 

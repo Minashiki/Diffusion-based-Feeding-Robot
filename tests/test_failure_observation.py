@@ -283,7 +283,7 @@ def test_diagnostics_preserve_original_and_log_branch(tmp_path, monkeypatch, dis
     assert len(rows) == 53 and rows[-1]["failure"] == "food_dropped"
     assert rows[0]["actual_tcp_acceleration_world"] is None
     assert rows[1]["derivative_valid"]
-    assert all(key in rows[-1] for key in ("food_local_velocity", "food_min_corner_plate_height_m",
+    assert all(key in rows[-1] for key in ("bean_local_velocity", "bean_min_bowl_height_m",
                "reference_joint_limit_margin", "actual_tcp_acceleration_world", "reference_tcp_acceleration_world"))
     commands = [json.loads(line) for line in (tmp_path / "diagnostic/diagnostic_commands.jsonl").read_text().splitlines()]
     fault = next(row for row in commands if row.get("fault"))
@@ -318,7 +318,7 @@ def test_diagnostics_zero_time_protection_boundary(tmp_path, monkeypatch, displa
     assert rows[-1]["tick"] == rows[-2]["tick"] == 52
     assert rows[-1]["derivative_dt_s"] == 0 and not rows[-1]["derivative_valid"]
     assert rows[-1]["actual_tcp_acceleration_world"] is None
-    assert rows[-1]["food_local_velocity"] is None
+    assert rows[-1]["bean_local_velocity"] is None
 
 
 def test_diagnostics_unavailable_window_keeps_original(tmp_path, monkeypatch, display):
