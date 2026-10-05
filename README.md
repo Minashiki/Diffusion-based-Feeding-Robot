@@ -1,3 +1,9 @@
+# M5 DiT 工程与训练交接
+
+M5 使用项目专用 DiT：12 Block、d=512、8 heads、MLP=2048，adaLN-Zero＋条件交叉注意力，H=16。训练和推理优先使用 `/home/minashiki/anaconda3/envs/feedingrobot` 的 CUDA，进程树默认 6 个逻辑 CPU、最多 8 个。完整命令、续训、闭环选模和冻结步骤见 [M5 训练指南](docs/m5_training.md)。
+
+本轮只做工程与小规模验证，正式训练由用户执行；完整 M5／DP_v1 放行必须在训练后通过独立 test 闭环门禁。M4 修订 4 的冻结数据与历史报告保持，旧物理验收和严格重放不重跑。正式范围仅 Panda。
+
 # 当前单豆 M4
 
 固定碗、源勺和 `bean_000` 沿用已冻结 M1/M3。M4 教师接入 12 点舀取、精确回平与沉降、渐进释放和固定避让；观测 schema 3 为 Panda 108／UR5e 106 维，新增当前接收面位姿。接口和门禁见 [M4 文档](docs/m4_interfaces.md)。

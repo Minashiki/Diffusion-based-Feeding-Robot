@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "robot_id": "panda",
+  "parent": "outputs/single_bean/v1/m4/revision_4",
+  "dataset": "datasets/single_bean/v1/m4/panda",
+  "model": {"depth": 12, "hidden_size": 512, "heads": 8, "mlp_hidden": 2048, "horizon": 16},
+  "diffusion": {"train_steps": 100, "inference_steps": 10, "beta_schedule": "squaredcos_cap_v2"},
+  "training": {
+    "seed": 0, "batch_size": 64, "updates": 100000, "lr": 0.0001,
+    "weight_decay": 0.01, "ema_decay": 0.9999, "gradient_clip": 1.0,
+    "validation_every": 1000, "checkpoint_every": 5000, "evaluation_every": 10000,
+    "validation_batches": 16, "workers": 2, "cpu_budget": 6, "torch_threads": 4
+  },
+  "acceptance": {"full_success": 0.8, "stage_success": 0.9}
+}
