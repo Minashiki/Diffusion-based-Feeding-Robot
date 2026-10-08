@@ -64,8 +64,8 @@ def sample_actions(model,config,batch,normalization,generator):
     for step in sampler.timesteps:
         prediction=model.denoiser(actions,step.expand(len(actions)),condition)
         actions=sampler.step(prediction,step,actions,eta=0).prev_sample
-    return actions*torch.as_tensor(normalization['action_std'],device=actions.device)+torch.as_tensor(
-        normalization['action_mean'],device=actions.device)
+    from feedingrobot.policies.normalization import denormalize_actions
+    return denormalize_actions(actions,normalization)
 
 
 @torch.no_grad()

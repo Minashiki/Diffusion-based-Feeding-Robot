@@ -53,10 +53,17 @@ def features(ticks, observations, valid, tick, fields, normalization=None):
                 velocity[i*6+3:i*6+6] = angular
     phase = states[-1, fields['stage']].copy()
     interaction = states[-1, fields['interaction']].copy()
-    if normalization:
-        states = (states - np.array(normalization['observation_mean'])) / np.array(normalization['observation_std'])
-        history = (history - np.array(normalization['observation_mean'])) / np.array(normalization['observation_std'])
-        velocity = (velocity - np.array(normalization['velocity_mean'])) / np.array(normalization['velocity_std'])
+    if normalization and normalization.get('kind') != 'none':
+        if normalization.get('kind') == 'minmax':
+            states = (states - np.array(normalization['observation_offset'])) / np.array(normalization['observation_scale'])
+            history = (history - np.array(normalization['observation_offset'])) / np.array(normalization['observation_scale'])
+            velocity = (velocity - np.array(normalization['velocity_offset'])) / np.array(normalization['velocity_scale'])
+            state_age = (state_age - normalization['state_age_offset'][0]) / normalization['state_age_scale'][0]
+            age = (age - normalization['history_age_offset'][0]) / normalization['history_age_scale'][0]
+        else:
+            states = (states - np.array(normalization['observation_mean'])) / np.array(normalization['observation_std'])
+            history = (history - np.array(normalization['observation_mean'])) / np.array(normalization['observation_std'])
+            velocity = (velocity - np.array(normalization['velocity_mean'])) / np.array(normalization['velocity_std'])
     state_input = np.concatenate([states, np.tile(velocity, (2, 1)), state_age[:, None], state_mask[:, None]], axis=1)
     columns = np.r_[tuple(np.arange(fields[name].start, fields[name].stop) for name in
                          ('compensated_wrench', 'q', 'dq', 'tcp_twist_world'))]
@@ -156,7 +163,8 @@ class ActionWindows(Dataset):
         actions, mask = np.zeros((self.horizon, 6), np.float32), np.zeros(self.horizon, bool)
         values = a['actions'][start:end]
         if self.normalization:
-            values = (values - np.array(self.normalization['action_mean'])) / np.array(self.normalization['action_std'])
+            from feedingrobot.policies.normalization import normalize_actions
+            values = normalize_actions(values, self.normalization)
         actions[:end-start], mask[:end-start] = values, True
         return {k: torch.as_tensor(v) for k, v in dict(**x, actions=actions, action_mask=mask).items()}
 

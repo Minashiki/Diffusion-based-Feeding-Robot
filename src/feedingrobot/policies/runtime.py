@@ -42,12 +42,31 @@ def setup(config, device='cuda'):
                 gpu=torch.cuda.get_device_name(device) if device.type == 'cuda' else None,
                 cpu_affinity=sorted(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else None,
                 torch_threads=torch.get_num_threads(), interop_threads=torch.get_num_interop_threads())
+    if config['model'].get('name') == 'MinaDiTV3':
+        info['inference_precision'] = 'fp32_ieee'
     return device, info
 
 
 def precision(device):
     return (torch.autocast('cuda', dtype=torch.bfloat16)
             if device.type == 'cuda' and torch.cuda.is_bf16_supported() else contextlib.nullcontext())
+
+
+@contextlib.contextmanager
+def inference_precision(device, config):
+    if config['model'].get('name') != 'MinaDiTV3':
+        yield
+        return
+    backends = (torch.backends.cuda.matmul, torch.backends.cudnn, torch.backends.cudnn.conv)
+    previous = [backend.fp32_precision for backend in backends]
+    try:
+        for backend in backends:
+            backend.fp32_precision = 'ieee'
+        with torch.autocast(device.type, enabled=False):
+            yield
+    finally:
+        for backend, value in zip(backends, previous):
+            backend.fp32_precision = value
 
 
 def to_device(batch, device):

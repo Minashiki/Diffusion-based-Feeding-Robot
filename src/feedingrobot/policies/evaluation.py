@@ -13,6 +13,7 @@ from feedingrobot.envs import FeedingGymEnv
 from feedingrobot.policies.audit import read_json
 from feedingrobot.policies.data import features, field_slices
 from feedingrobot.policies.dit import sample_actions
+from feedingrobot.policies.normalization import update_ranges
 from feedingrobot.policies.runtime import precision
 from feedingrobot.sim.events import PHASES
 
@@ -36,6 +37,7 @@ def run_policy(model, config, normalization, episode, device, *, viewer=False, m
     env = FeedingGymEnv('panda')
     display = None
     traces, inference_times, observation_ticks, observation_values = [], [], [], []
+    input_ranges = {}
     chunk, last_plan = None, -200
     wrist_peak = 0.
     try:
@@ -66,6 +68,8 @@ def run_policy(model, config, normalization, episode, device, *, viewer=False, m
                     x = features(np.array(observation_ticks), np.array(observation_values),
                                  np.ones(len(observation_ticks), bool), task.tick, fields, normalization)
                     batch = {k: torch.as_tensor(v, device=device)[None] for k, v in x.items()}
+                    if normalization.get('kind') == 'minmax':
+                        update_ranges(batch, input_ranges)
                     if device.type == 'cuda':
                         torch.cuda.synchronize(device)
                     before = time.perf_counter()
@@ -117,7 +121,7 @@ def run_policy(model, config, normalization, episode, device, *, viewer=False, m
                     contact_impulse_ns=task.monitor.impulse_ns,
                     linear_command_jump_max=float(np.linalg.norm(differences[:, :3], axis=1).max()),
                     angular_command_jump_max=float(np.linalg.norm(differences[:, 3:], axis=1).max()),
-                    inference_s=inference_times, trace=traces,
+                    inference_s=inference_times, trace=traces, input_ranges=input_ranges,
                     visualization=display.close() if display is not None else dict(status='disabled'))
     finally:
         if display is not None:

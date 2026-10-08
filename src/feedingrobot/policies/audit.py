@@ -56,7 +56,10 @@ def parent_check(config, *, root=ROOT):
         additions = sorted(set(input_hashes()) - set(frozen['input_sha256']))
         for relative in additions:
             if not (relative.startswith('src/feedingrobot/policies/')
-                    or relative in ('configs/dp_dit.json', 'docs/m5_training.md', 'tests/test_m5.py')
+                    or relative in ('configs/dp_dit.json', 'configs/minadit_v2.json', 'configs/minadit_v3.json',
+                                    'configs/minadit_v3_start_pose_v2.json',
+                                    'docs/m5_training.md', 'tests/test_m5.py', 'tests/test_minadit.py',
+                                    'tests/test_minadit_v3.py')
                     or relative in tuple(f'src/feedingrobot/scripts/{name}.py' for name in ('train_dp', 'eval_dp', 'validate_m5'))):
                 raise ValueError(f'Unexpected runtime addition outside M5: {relative}')
     files = {str(p.relative_to(dataset)) for p in dataset.rglob('*') if p.is_file()
@@ -90,3 +93,8 @@ def checkpoint_check(checkpoint, config, parent):
             or checkpoint['parent']['dataset_binding'] != parent['dataset_binding']
             or checkpoint['source_hashes'] != input_hashes()):
         raise ValueError('Checkpoint configuration, data or source differs from this run')
+    from feedingrobot.policies.models import check_normalization, model_name
+    if checkpoint.get('model_name', model_name(config)) != model_name(config):
+        raise ValueError('Checkpoint model name differs from its configuration')
+    if 'normalization' in checkpoint:
+        check_normalization(config, checkpoint['normalization'])

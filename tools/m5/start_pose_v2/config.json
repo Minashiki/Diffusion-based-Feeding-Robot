@@ -1,0 +1,12 @@
+{
+  "version": "start_pose_v2",
+  "bounds_m": [[0.35, 0.55], [-0.25, -0.04], [0.12, 0.25]],
+  "grid": [4, 5, 2],
+  "per_cell": 5,
+  "clearance_m": 0.005,
+  "joint_margin_rad": 0.02,
+  "position_tolerance_m": 0.005,
+  "rotation_tolerance_rad": 0.02,
+  "recipe_index_base": 10000,
+  "max_candidates_per_cell": 150
+}

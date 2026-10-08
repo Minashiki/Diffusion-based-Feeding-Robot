@@ -11,7 +11,10 @@ from torch.utils.data import DataLoader, default_collate
 from feedingrobot.data.episodes import input_hashes, write_json
 from feedingrobot.policies.audit import checkpoint_check, parent_check
 from feedingrobot.policies.data import ActionWindows, fit_normalization
-from feedingrobot.policies.dit import ActionDiT, noise_loss, schedulers
+from feedingrobot.policies.dit import noise_loss, schedulers
+from feedingrobot.policies.corpus import TrainingWindows, correction_check, start_pose_check
+from feedingrobot.policies.models import check_normalization, create_model, model_name
+from feedingrobot.policies.normalization import fit_minmax, no_normalization, update_ranges
 from feedingrobot.policies.runtime import precision, restore_rng, rng_state, save_checkpoint, setup, to_device
 from feedingrobot.sim.model import ROOT
 
@@ -37,7 +40,7 @@ def update_ema(ema, model, decay):
 
 
 @torch.no_grad()
-def validation_loss(model, dataset, scheduler, config, device):
+def validation_loss(model, dataset, scheduler, config, device, range_report=None):
     # Fixed validation noise/samples; this must not consume training RNG state.
     rng = np.random.default_rng(123)
     generator = torch.Generator(device=device).manual_seed(123)
@@ -46,6 +49,8 @@ def validation_loss(model, dataset, scheduler, config, device):
     for _ in range(config['training']['validation_batches']):
         indices = dataset.sample_indices(rng, config['training']['batch_size'])
         batch = to_device(default_collate([dataset[i] for i in indices]), device)
+        if range_report is not None:
+            update_ranges(batch, range_report)
         noise = torch.randn(batch['actions'].shape, device=device, generator=generator)
         steps = torch.randint(scheduler.config.num_train_timesteps, (len(indices),), device=device, generator=generator)
         with precision(device):
@@ -58,6 +63,8 @@ def train(config, output, *, device='cuda', resume=None, updates=None, headless=
     output = Path(output)
     parent = parent_check(config)
     source = input_hashes()
+    correction = correction_check(config)
+    extension = start_pose_check(config)
     checkpoint = torch.load(resume, map_location='cpu', weights_only=False) if resume else None
     if checkpoint:
         checkpoint_check(checkpoint, config, parent)
@@ -65,13 +72,27 @@ def train(config, output, *, device='cuda', resume=None, updates=None, headless=
             raise ValueError('Diagnostic overfit is not a formal training checkpoint')
         if output.resolve() != Path(resume).resolve().parent:
             raise ValueError('Resume must use the original run directory')
+        if checkpoint.get('correction') != correction:
+            raise ValueError('Checkpoint correction data binding differs')
+        if checkpoint.get('train_extension') != extension:
+            raise ValueError('Checkpoint start-pose data binding differs')
+        if checkpoint['normalization'] != json.loads((output / 'normalization.json').read_text()):
+            raise ValueError('Checkpoint normalization differs from its run')
     else:
         output.mkdir(parents=True, exist_ok=False)
-    raw = ActionWindows(ROOT / config['dataset'], 'train', config['model']['horizon'])
-    normalization = checkpoint['normalization'] if checkpoint else fit_normalization(raw)
-    raw.normalization = normalization
+    raw = TrainingWindows(config, correction, extension=extension)
+    normalization = (checkpoint['normalization'] if checkpoint else
+                     no_normalization(raw) if model_name(config) == 'MinaDiTV3' else
+                     fit_minmax(raw) if model_name(config) == 'MinaDiTV2' else fit_normalization(raw.base))
+    if not checkpoint and model_name(config) in ('MinaDiTV2', 'MinaDiTV3'):
+        normalization['source_binding'] = dict(m4_dataset_binding=parent['dataset_binding'],
+                                               correction_report_sha256=correction['report_sha256'] if correction else None)
+        if extension:
+            normalization['source_binding']['train_extension_report_sha256'] = extension['report_sha256']
+    check_normalization(config, normalization)
+    raw.set_normalization(normalization)
     validation = ActionWindows(ROOT / config['dataset'], 'validation', config['model']['horizon'], normalization)
-    model = ActionDiT(config).to(device)
+    model = create_model(config).to(device)
     ema = copy.deepcopy(model).eval().requires_grad_(False)
     settings = config['training']
     optimizer = torch.optim.AdamW(model.parameters(), lr=settings['lr'], weight_decay=settings['weight_decay'])
@@ -94,7 +115,11 @@ def train(config, output, *, device='cuda', resume=None, updates=None, headless=
     write_json(output / 'hardware.json', hardware)
     write_json(output / 'data_summary.json', dict(windows=len(raw),
                phases={str(phase): sum(map(len, episodes.values())) for phase, episodes in raw.by_phase.items()},
-               normalization_count=normalization['count'], parameters=sum(p.numel() for p in model.parameters())))
+               normalization_count=normalization['count'], model_name=model_name(config),
+               parameters=sum(p.numel() for p in model.parameters()), **raw.summary()))
+    write_json(output / 'correction_audit.json', correction)
+    if extension:
+        write_json(output / 'train_extension_audit.json', extension)
     total = settings['updates'] if updates is None else updates
     if total <= step:
         raise ValueError('Target updates must exceed the resumed step')
@@ -105,6 +130,7 @@ def train(config, output, *, device='cuda', resume=None, updates=None, headless=
                         multiprocessing_context='spawn' if settings['workers'] else None)
     def payload():
         return dict(schema_version=1, config=config, parent=parent, source_hashes=source, normalization=normalization,
+                    model_name=model_name(config), correction=correction, train_extension=extension,
                     model=model.state_dict(), ema=ema.state_dict(), optimizer=optimizer.state_dict(),
                     step=step, best_score=best, rng=rng_state(rng), diagnostic=False, hardware=hardware)
     write_json(output / 'status.json', dict(status='training', step=step))
@@ -125,7 +151,10 @@ def train(config, output, *, device='cuda', resume=None, updates=None, headless=
             step += 1
             record = dict(step=step, loss=float(loss.detach()), gradient_norm=float(norm))
             if step % settings['validation_every'] == 0:
-                record['validation_loss'] = validation_loss(ema, validation, scheduler, config, device)
+                ranges = {} if model_name(config) == 'MinaDiTV2' else None
+                record['validation_loss'] = validation_loss(ema, validation, scheduler, config, device, ranges)
+                if ranges is not None:
+                    record['validation_input_range'] = ranges
             if step % settings['evaluation_every'] == 0:
                 from feedingrobot.policies.evaluation import evaluate
                 report = evaluate(ema, config, normalization, device, 'validation', output / f'validation_{step}', viewer=not headless)
@@ -144,6 +173,10 @@ def train(config, output, *, device='cuda', resume=None, updates=None, headless=
                 save_checkpoint(output / 'last.pt', payload())
         if input_hashes() != source:
             raise ValueError('Runtime source changed during training')
+        if correction_check(config) != correction:
+            raise ValueError('Correction inputs changed during training')
+        if start_pose_check(config) != extension:
+            raise ValueError('Start-pose inputs changed during training')
         save_checkpoint(output / 'last.pt', payload())
     write_json(output / 'status.json', dict(status='trained_not_released', step=step, best_validation_score=best,
                                           m5_status='incomplete', test_status='not_verified'))

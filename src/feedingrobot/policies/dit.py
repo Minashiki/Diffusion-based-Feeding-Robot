@@ -11,6 +11,8 @@ import torch
 from torch import nn
 from diffusers import DDIMScheduler, DDPMScheduler
 
+from feedingrobot.policies.runtime import inference_precision
+
 
 def positions(count, width, device):
     frequency = torch.exp(-math.log(10000) * torch.arange(width // 2, device=device) / (width // 2))
@@ -128,7 +130,7 @@ class ActionDiT(nn.Module):
 def schedulers(config):
     settings = dict(num_train_timesteps=config['diffusion']['train_steps'],
                     beta_schedule=config['diffusion']['beta_schedule'], prediction_type='epsilon',
-                    clip_sample=False, timestep_spacing='trailing')
+                    clip_sample=False, timestep_spacing=config['diffusion'].get('timestep_spacing', 'trailing'))
     return DDPMScheduler(**settings), DDIMScheduler(**settings)
 
 
@@ -144,14 +146,14 @@ def noise_loss(model, scheduler, batch, *, noise=None, timesteps=None):
 
 @torch.no_grad()
 def sample_actions(model, config, batch, normalization, generator=None):
-    _, scheduler = schedulers(config)
-    scheduler.set_timesteps(config['diffusion']['inference_steps'], device=batch['states'].device)
-    condition = model.encoder(batch)
-    actions = torch.randn((len(batch['states']), model.horizon, 6), device=batch['states'].device, generator=generator)
-    for step in scheduler.timesteps:
-        steps = step.expand(len(actions))
-        noise = model.denoiser(actions, steps, condition)
-        actions = scheduler.step(noise, step, actions, eta=0).prev_sample
-    mean = torch.as_tensor(normalization['action_mean'], device=actions.device)
-    scale = torch.as_tensor(normalization['action_std'], device=actions.device)
-    return actions * scale + mean
+    with inference_precision(batch['states'].device, config):
+        _, scheduler = schedulers(config)
+        scheduler.set_timesteps(config['diffusion']['inference_steps'], device=batch['states'].device)
+        condition = model.encoder(batch)
+        actions = torch.randn((len(batch['states']), model.horizon, 6), device=batch['states'].device, generator=generator)
+        for step in scheduler.timesteps:
+            steps = step.expand(len(actions))
+            noise = model.denoiser(actions, steps, condition)
+            actions = scheduler.step(noise, step, actions, eta=0).prev_sample
+        from feedingrobot.policies.normalization import denormalize_actions
+        return denormalize_actions(actions, normalization)

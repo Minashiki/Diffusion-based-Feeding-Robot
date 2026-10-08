@@ -1,8 +1,8 @@
 # M5 DiT 工程与训练交接
 
-M5 使用项目专用 DiT：12 Block、d=512、8 heads、MLP=2048，adaLN-Zero＋条件交叉注意力，H=16。训练和推理优先使用 `/home/minashiki/anaconda3/envs/feedingrobot` 的 CUDA，进程树默认 6 个逻辑 CPU、最多 8 个。完整命令、续训、闭环选模和冻结步骤见 [M5 训练指南](docs/m5_training.md)。
+M5 后续默认使用 **MinaDiTV3**：保留 V2 的 6 Block、d=512、8 heads、MLP=2048、因果动作自注意力、动作通道补零和 H=16；取消条件输入与动作标签归一化，动作直接使用 m/s、rad/s，推理使用 FP32 并关闭 BF16／TF32。训练仍沿用原 BF16 自动混合精度策略。**MinaDiTv1** 与 **MinaDiTV2** 保留，可通过 `--model` 选择。三版说明见 [模型介绍](MinaDiT_MODELS.md)。训练和推理优先使用 `/home/minashiki/anaconda3/envs/feedingrobot` 的 CUDA，进程树默认 6 个逻辑 CPU、最多 8 个。完整命令、续训、闭环选模和冻结步骤见 [M5 训练指南](docs/m5_training.md)。
 
-本轮只做工程与小规模验证，正式训练由用户执行；完整 M5／DP_v1 放行必须在训练后通过独立 test 闭环门禁。M4 修订 4 的冻结数据与历史报告保持，旧物理验收和严格重放不重跑。正式范围仅 Panda。
+V3 从头训练，不能把 V2 权重直接改名沿用；本轮只做工程与小规模验证，正式训练由用户执行。完整 M5／DP_v1 放行必须在训练后通过独立 test 闭环门禁。M4 修订 4 的冻结数据与历史报告保持，旧物理验收和严格重放不重跑。正式范围仅 Panda。
 
 # 当前单豆 M4
 

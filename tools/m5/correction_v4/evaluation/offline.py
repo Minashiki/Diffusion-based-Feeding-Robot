@@ -57,7 +57,8 @@ def windows(config,normalization,data):
 def evaluate(model,config,normalization,device,output,cases,items):
     output=Path(output);output.mkdir(parents=True,exist_ok=False)
     labels=default_collate(items);mask=labels['action_mask'].numpy()
-    truth=labels['actions'].numpy()*np.asarray(normalization['action_std'])+np.asarray(normalization['action_mean'])
+    from feedingrobot.policies.normalization import denormalize_actions
+    truth=denormalize_actions(labels['actions'].numpy(),normalization)
     archives=dict(truth=truth,action_mask=mask);results={}
     # Use the actual frozen robot protection thresholds.
     from feedingrobot.sim.model import load_json
