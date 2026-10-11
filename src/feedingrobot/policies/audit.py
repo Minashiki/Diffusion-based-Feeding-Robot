@@ -56,10 +56,13 @@ def parent_check(config, *, root=ROOT):
         additions = sorted(set(input_hashes()) - set(frozen['input_sha256']))
         for relative in additions:
             if not (relative.startswith('src/feedingrobot/policies/')
-                    or relative in ('configs/dp_dit.json', 'configs/minadit_v2.json', 'configs/minadit_v3.json',
-                                    'configs/minadit_v3_start_pose_v2.json',
-                                    'docs/m5_training.md', 'tests/test_m5.py', 'tests/test_minadit.py',
-                                    'tests/test_minadit_v3.py')
+                    or relative in ('configs/minadit_v4.json', 'configs/minadit_v4_epsilon.json', 'configs/minadit_v5.json',
+                                    'docs/minadit_v5_normalization.md', 'tests/test_minadit_v5.py',
+                                    'tests/test_minadit_v5_normalization.py',
+                                    'docs/m5_diffusion_improvement.md', 'tests/test_dp_normalization.py',
+                                    'tests/test_minadit_v4.py', 'tests/test_diffusion_diagnostics.py',
+                                    'tests/test_diffusion_data_audit.py',
+                                    'docs/m5_training.md', 'tests/test_m5.py')
                     or relative in tuple(f'src/feedingrobot/scripts/{name}.py' for name in ('train_dp', 'eval_dp', 'validate_m5'))):
                 raise ValueError(f'Unexpected runtime addition outside M5: {relative}')
     files = {str(p.relative_to(dataset)) for p in dataset.rglob('*') if p.is_file()

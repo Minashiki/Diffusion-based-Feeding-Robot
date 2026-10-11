@@ -1,14 +1,14 @@
 # M5 DiT 工程与训练交接
 
-M5 后续默认使用 **MinaDiTV3**：保留 V2 的 6 Block、d=512、8 heads、MLP=2048、因果动作自注意力、动作通道补零和 H=16；取消条件输入与动作标签归一化，动作直接使用 m/s、rad/s，推理使用 FP32 并关闭 BF16／TF32。训练仍沿用原 BF16 自动混合精度策略。**MinaDiTv1** 与 **MinaDiTV2** 保留，可通过 `--model` 选择。三版说明见 [模型介绍](MinaDiT_MODELS.md)。训练和推理优先使用 `/home/minashiki/anaconda3/envs/feedingrobot` 的 CUDA，进程树默认 6 个逻辑 CPU、最多 8 个。完整命令、续训、闭环选模和冻结步骤见 [M5 训练指南](docs/m5_training.md)。
+M5 默认使用 **MinaDiTV5**，保留 **MinaDiTV4** 作为对照。两版共用 6 Block、d=512、8 heads、MLP=2048、因果动作自注意力、动作通道补零和 H=16，训练与推理均采用 FP32 IEEE。V4 只拟合动作 limits，使用 DDIM leading/10；V5 同时拟合动作、连续观测、派生速度与帧龄，使用 trailing/100。模型说明见 [模型介绍](MinaDiT_MODELS.md)。训练优先使用 `/home/minashiki/anaconda3/envs/feedingrobot` 的 CUDA，进程树默认 6 个逻辑 CPU、最多 8 个。完整命令、续训、闭环选模和冻结步骤见 [M5 训练指南](docs/m5_training.md)。
 
-V3 从头训练，不能把 V2 权重直接改名沿用；本轮只做工程与小规模验证，正式训练由用户执行。完整 M5／DP_v1 放行必须在训练后通过独立 test 闭环门禁。M4 修订 4 的冻结数据与历史报告保持，旧物理验收和严格重放不重跑。正式范围仅 Panda。
+V4 之前的模型入口、旧权重、专用训练工具、验证与烟测输出已清理。全部数据集及当前 M1／M3／M4 冻结祖先证据保留，V5 继续使用 M4 的 200 条 train 回合与 start_pose_v2 的 200 条扩充回合；V5 首次训练从头初始化。checkpoint 仍严格绑定源码、配置、数据与归一化，不改写检查点绕过源码校验。完整 M5／DP_v1 放行必须在训练后通过独立 test 闭环门禁，正式范围仅 Panda。
 
 # 当前单豆 M4
 
 固定碗、源勺和 `bean_000` 沿用已冻结 M1/M3。M4 教师接入 12 点舀取、精确回平与沉降、渐进释放和固定避让；观测 schema 3 为 Panda 108／UR5e 106 维，新增当前接收面位姿。接口和门禁见 [M4 文档](docs/m4_interfaces.md)。
 
-当前正式范围仅 Panda；UR5e 实现与历史证据保留，暂停验收。完成状态只由 `outputs/single_bean/v1/m4/revision_4/panda/report.json`、`teacher_release_audit.json` 及最终 `acceptance_audit.json` 确认。修订 3 已通过的物理证据经校验承接，不重复运行；教师 v2、M4 接触确认 1.1 秒及其余物理门槛不变。正式数据位于 `datasets/single_bean/v1/m4/panda/`；没有通过教师门禁不能采集。调试目录为 `outputs/single_bean/v1/m4_tuning/`。旧食物输出和诊断已清理，下文历史成绩不代表当前放行。
+当前正式范围仅 Panda；UR5e 实现与冻结祖先证据保留，暂停验收。完成状态只由 `outputs/single_bean/v1/m4/revision_4/panda/report.json`、`teacher_release_audit.json` 及最终 `acceptance_audit.json` 确认。修订 3 已通过的物理证据经校验承接，不重复运行；教师 v2、M4 接触确认 1.1 秒及其余物理门槛不变。正式数据位于 `datasets/single_bean/v1/m4/panda/`；没有通过教师门禁不能采集。M4 调试目录仅保留冻结证据引用的回滚／多样性记录及测试报告。其它无用历史输出已清理，下文保留的旧命令和成绩用于说明当时版本。
 
 # FeedingRobot DPRL — 单豆喂餐原型
 
@@ -27,7 +27,7 @@ conda run -n feedingrobot python -m feedingrobot.scripts.validate_m1 --robot all
 
 ## 历史 15 豆及盘子 v2 记录
 
-以下模型描述、旧命令、测试数量和阶段成绩仅对应历史版本，不能用于当前单豆放行；M3/M4 入口尚未迁移。
+以下模型描述、旧命令、测试数量和阶段成绩仅对应历史版本，不能用于当前单豆放行。无用历史目录已清理，只有当前冻结祖先引用的证据继续保留；旧命令中的输出路径不代表文件仍然存在。
 
 # FeedingRobot DPRL — M0 / M1 / M3
 
@@ -65,7 +65,7 @@ conda run -n feedingrobot python -m feedingrobot.scripts.collect --robot panda -
 conda run -n feedingrobot python -m feedingrobot.scripts.replay outputs/single_bean/v1/m4/revision_3/panda/episodes/<seed> --robot panda
 ```
 
-`demo_m4` 默认从盘中食物开始，失败返回非零；去掉 `--headless` 打开只读 viewer。教师放行后，`collect --viewer` 可在采集时显示环境；窗口按墙钟最多 30 FPS 刷新，不固定暂停物理推进，关闭窗口后继续采集。命令会保存独立演示目录。`validate_m4 --trials 3 --cases teacher replay --output outputs/single_bean/v1/m4_tuning/partial` 只做局部检查，不满足正式放行条件。复用报告或采集目录要求源码／配置／资产哈希一致，版本变化应使用新输出目录；M0 环境记录保留。
+`demo_m4` 默认从盘中食物开始，失败返回非零；去掉 `--headless` 打开只读 viewer。教师放行后，`collect --viewer` 可在采集时显示环境；窗口按墙钟最多 30 FPS 刷新，不固定暂停物理推进，关闭窗口后继续采集。命令会保存独立演示目录。`validate_m4 --trials 3 --cases teacher replay --output outputs/single_bean/v1/m4_tuning/partial` 只做局部检查，不满足正式放行条件。复用报告或采集目录要求源码／配置／资产哈希一致，版本变化应使用新输出目录；旧 M0 环境输出已清理。
 
 快照的任务签名升级至 v2，补齐立即恢复边界的加速度／传感器缓存；并记录 event_rules_version=2；旧任务快照和旧事件判据不兼容。
 
@@ -116,7 +116,7 @@ conda run -n feedingrobot python -m pip install -r requirements.lock.txt -e .
 conda run -n feedingrobot python -m pip check
 ```
 
-`requirements.txt` 保存直接依赖，`requirements.lock.txt` 保存本次解析后的全部 pip 版本，`environment.yml` 固定 Python 版本。原生 conda 包的精确清单、安装前快照、依赖解析报告和设备信息位于 `outputs/m0/`。当前按源码 checkout＋editable 安装交付，不是脱离资产目录的独立 wheel。
+`requirements.txt` 保存直接依赖，`requirements.lock.txt` 保存解析后的全部 pip 版本，`environment.yml` 固定 Python 版本。旧 `outputs/m0/` 环境快照、依赖解析报告和设备输出已清理。当前按源码 checkout＋editable 安装交付，不是脱离资产目录的独立 wheel。
 
 ## 配置与报告
 
@@ -126,11 +126,14 @@ conda run -n feedingrobot python -m pip check
 - `configs/task.json`：M3 阶段、接触事件及奖励的固定工程阈值。
 - `configs/acceptance_m3.json`：M3 固定 seeds 与步长／求解精度对照的事件时间、位置、力及冲量容差。
 - `configs/acceptance_m4.json`：M4 独立数值容差；用户授权修订 3 接触确认 1.1 秒，其余值保持 M3 冻结容差。
-- `outputs/m0/doctor.json`：逐项环境与算法自检。
-- `outputs/single_bean/v1/m1/<robot>/`：重建后生成的新模型物理报告与轨迹。
-- `outputs/single_bean/v1/m3/<robot>/`：重建后生成的事件、快照、收敛和环境验收证据。
-- `outputs/single_bean/v1/m4/revision_4/panda/`：单 Panda 承接与数据放行报告；修订 3 原始证据保留；正式采集显式传入匹配的 `--gate`。
-- `outputs/single_bean/v1/m4_tuning/`：新模型调试结果，与正式验收分开。
+- `datasets/`：全部可复用数据集保留，包括 M4、start_pose_v2 与历史纠偏示教数据。
+- `outputs/single_bean/v1/m1/`、`m3/`：保留当前冻结祖先证据与源文件快照。
+- `outputs/single_bean/v1/m4/revision_4/`：保留完整父冻结包、承接与数据放行报告；正式采集显式传入匹配的 `--gate`。
+- `outputs/single_bean/v1/m4/revision_3/`：保留 Panda、源文件快照及下游冻结证据引用的报告。
+- `outputs/single_bean/v1/m4_tuning/`：仅保留被引用的 `revision_3_rollback/diversity/` 与 `revision_3_tests.log`／`.xml`。
+- `outputs/single_bean/start_pose_v2/collection_001/`：保留扩充数据的采集报告与审计。
+- `outputs/single_bean/v1/m5/dit/MinaDiTV4/`、`MinaDiTV5/`：当前模型输出；旧模型输出已清理。
+- `outputs/m0/`、`calibration/`、`m3_tuning/`、旧 M4 修订及无用验证／烟测输出已清理。
 - `SimModelPlann.md`：从 M1 重建的主方案；`docs/interfaces.md`：执行接口与坐标/时间契约，餐具坐标与完整工具负载已按新模型适配。
 
 部分检查可用 `validate_m1 --cases hold tracking` 单独运行；未选择的项目仍标记 `not_verified`，退出码为非零。建议使用 `--output outputs/calibration/<name>` 保存调试结果，避免覆盖完整报告。

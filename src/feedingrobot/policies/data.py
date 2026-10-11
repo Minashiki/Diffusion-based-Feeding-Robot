@@ -53,13 +53,15 @@ def features(ticks, observations, valid, tick, fields, normalization=None):
                 velocity[i*6+3:i*6+6] = angular
     phase = states[-1, fields['stage']].copy()
     interaction = states[-1, fields['interaction']].copy()
-    if normalization and normalization.get('kind') != 'none':
-        if normalization.get('kind') == 'minmax':
-            states = (states - np.array(normalization['observation_offset'])) / np.array(normalization['observation_scale'])
-            history = (history - np.array(normalization['observation_offset'])) / np.array(normalization['observation_scale'])
-            velocity = (velocity - np.array(normalization['velocity_offset'])) / np.array(normalization['velocity_scale'])
-            state_age = (state_age - normalization['state_age_offset'][0]) / normalization['state_age_scale'][0]
-            age = (age - normalization['history_age_offset'][0]) / normalization['history_age_scale'][0]
+    if normalization and normalization.get('kind') not in ('none', 'limits'):
+        if normalization.get('kind') == 'dp_limits':
+            from feedingrobot.policies.dp_normalizer import linear_transform
+            params = normalization['params_dict']
+            states = linear_transform(states, params['observation'])
+            history = linear_transform(history, params['observation'])
+            velocity = linear_transform(velocity, params['velocity'])
+            state_age = linear_transform(state_age[:, None], params['state_age'])[:, 0]
+            age = linear_transform(age[:, None], params['history_age'])[:, 0]
         else:
             states = (states - np.array(normalization['observation_mean'])) / np.array(normalization['observation_std'])
             history = (history - np.array(normalization['observation_mean'])) / np.array(normalization['observation_std'])
@@ -134,6 +136,9 @@ class ActionWindows(Dataset):
             path, m = self.episodes[episode]
             a = {name: np.load(path / f'{name}.npy', mmap_mode='r') for name in
                  ('actions', 'action_ticks', 'action_observations', 'observations', 'observation_ticks', 'observation_valid')}
+            if self.normalization and self.normalization.get('observation_timing') == 'pre_action':
+                from feedingrobot.policies.causality import pre_action_observations
+                a['action_observations'] = pre_action_observations(path, a, self.fields, dt=m['dt'])
             n = m['observation_rows']
             # Merge exact action-boundary observations with the 50 Hz history.
             ticks = np.r_[a['observation_ticks'][:n], a['action_ticks']]
@@ -178,28 +183,3 @@ class ActionWindows(Dataset):
             windows = self.by_phase[phase][episode]
             result.append(windows[int(rng.integers(len(windows)))])
         return result
-
-
-def fit_normalization(dataset):
-    if dataset.split != 'train':
-        raise ValueError('Normalization must use train only')
-    observation = read_json(dataset.directory / 'normalization.json')
-    mean, std = np.array(observation['mean']), np.array(observation['std'])
-    for name in ('stage', 'interaction', 'execution_status'):
-        mean[dataset.fields[name]], std[dataset.fields[name]] = 0, 1
-    sums, squares, count = np.zeros(18), np.zeros(18), 0
-    for episode, start, _, _ in dataset.windows:
-        a = dataset.arrays(episode)
-        x = features(a['feature_ticks'], a['feature_values'], a['feature_valid'], int(a['action_ticks'][start]), dataset.fields)
-        width = sum(size for _, size, _ in dataset.schema['fields'])
-        values = np.r_[a['actions'][start], x['states'][-1, width:width+12]]
-        sums += values
-        squares += values**2
-        count += 1
-    average = sums / count
-    scale = np.sqrt(np.maximum(squares / count - average**2, 0))
-    scale = np.where(scale > 1e-8, scale, 1.)
-    return dict(schema_version=1, source_split='train', count=count, observation_schema=observation['observation_schema'],
-                observation_mean=mean.tolist(), observation_std=std.tolist(),
-                action_mean=average[:6].tolist(), action_std=scale[:6].tolist(),
-                velocity_mean=average[6:].tolist(), velocity_std=scale[6:].tolist())

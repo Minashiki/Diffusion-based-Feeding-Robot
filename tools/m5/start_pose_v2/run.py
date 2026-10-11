@@ -297,7 +297,7 @@ def record(row, dataset, output, report):
 def verify_binding(report):
     if report['tools_sha256'] != tool_hashes() or report['input_hashes'] != input_hashes():
         raise ValueError('Collection inputs/tools changed')
-    if report['parent'] != parent_check(read_json(ROOT / 'configs/minadit_v2.json')):
+    if report['parent'] != parent_check(read_json(ROOT / 'configs/minadit_v5.json')):
         raise ValueError('V1 parent/data binding changed')
     for name, digest in report['tools_sha256'].items():
         if sha256(Path(report['output']) / 'tool_snapshot' / name) != digest:
@@ -420,7 +420,7 @@ def main():
         audit(dataset, output, report)
     else:
         interrupted = historical_ids(teacher_config)
-        parent = parent_check(read_json(ROOT / 'configs/minadit_v2.json'))
+        parent = parent_check(read_json(ROOT / 'configs/minadit_v5.json'))
         output.mkdir(parents=True, exist_ok=False)
         dataset.mkdir(parents=True, exist_ok=False)
         (dataset / 'train').mkdir()

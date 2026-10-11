@@ -10,10 +10,12 @@ import torch
 from torch.utils.data import default_collate
 
 from feedingrobot.data.episodes import annotate, write_json
-from feedingrobot.envs.feeding import observation_schema
+from feedingrobot.envs.feeding import EXECUTION_STATES, observation_schema
 from feedingrobot.policies import audit, training
-from feedingrobot.policies.data import ActionWindows, asof, features, field_slices, fit_normalization
-from feedingrobot.policies.dit import ActionDiT, noise_loss, sample_actions, schedulers
+from feedingrobot.policies.data import ActionWindows, asof, features, field_slices
+from feedingrobot.policies.dit import noise_loss, sample_actions, schedulers
+from feedingrobot.policies.models import create_model
+from feedingrobot.policies.normalization import fit_limits
 from feedingrobot.policies.evaluation import ActionChunk, summarize
 from feedingrobot.policies.runtime import restore_rng, rng_state, save_checkpoint
 from feedingrobot.sim.model import ROOT
@@ -22,14 +24,15 @@ from feedingrobot.sim.model import ROOT
 @pytest.fixture(scope='session', autouse=True)
 def compute_budget():
     from feedingrobot.policies.runtime import setup
-    config = audit.read_json(ROOT / 'configs/dp_dit.json')
+    config = audit.read_json(ROOT / 'configs/minadit_v5.json')
     setup(config, 'cuda' if torch.cuda.is_available() else 'cpu')
 
 
 @pytest.fixture
 def config():
-    result = audit.read_json(ROOT / 'configs/dp_dit.json')
-    result['model'].update(depth=2, hidden_size=32, heads=4, mlp_hidden=128)
+    result = audit.read_json(ROOT / 'configs/minadit_v4.json')
+    result.pop('train_extension_report')
+    result['model'].update(hidden_size=32, heads=4, mlp_hidden=128)
     result['training'].update(batch_size=4, workers=0, validation_every=100, checkpoint_every=2, evaluation_every=100)
     return result
 
@@ -43,6 +46,7 @@ def observation(ticks, phases=None):
     x[:, fields['mouth_relative_world']] = np.asarray(ticks)[:, None] * 1e-6 + .1
     x[:, fields['receiver_relative_world']] = .2
     x[:, fields['stage']] = np.eye(8)[np.ones(len(ticks), int) if phases is None else phases]
+    x[:, fields['execution_status'].start + EXECUTION_STATES.index('idle')] = 1
     return x
 
 
@@ -68,6 +72,7 @@ def episode(directory, recover=False, split='train', group=None):
                   observation_ticks=obs_ticks, observation_valid=np.ones(len(obs_ticks), bool))
     for name, a in arrays.items():
         np.save(path / f'{name}.npy', a)
+    write_json(path / 'commands.json', [])
     m = dict(robot_id='panda', status='complete', dt=.001,
              observation_schema=json.loads(json.dumps(observation_schema('panda', 7))),
              events=events, segments=annotate(events), scenario=dict(recover=recover),
@@ -136,15 +141,12 @@ def test_phase_episode_sampling_is_balanced(dataset):
 
 
 def test_normalization_train_only_and_constant_scale(dataset):
-    norm = fit_normalization(dataset)
+    norm = fit_limits(dataset)
     assert norm['count'] == len(dataset)
-    assert norm['action_std'][0] == 1
-    fields = dataset.fields
-    for name in ('stage', 'interaction', 'execution_status'):
-        np.testing.assert_array_equal(np.array(norm['observation_std'])[fields[name]], 1)
+    assert norm['action_scale'][0] == 1
     dataset.split = 'validation'
-    with pytest.raises(ValueError, match='train only'):
-        fit_normalization(dataset)
+    with pytest.raises(ValueError, match='raw train'):
+        fit_limits(dataset)
 
 
 def test_episode_split_leakage_is_rejected(dataset):
@@ -170,10 +172,10 @@ def test_invalid_episode_is_rejected(dataset, change):
 
 def test_dit_shapes_masks_gradients_and_sampling(config, dataset):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    norm = fit_normalization(dataset)
+    norm = fit_limits(dataset)
     dataset.normalization = norm
     batch = {k: v.to(device) for k, v in default_collate([dataset[0], dataset[-1]]).items()}
-    model = ActionDiT(config).to(device)
+    model = create_model(config).to(device)
     scheduler, _ = schedulers(config)
     condition = model.encoder(batch)
     assert condition.tokens.shape == (2, 13, 32)
@@ -209,7 +211,7 @@ def test_dit_shapes_masks_gradients_and_sampling(config, dataset):
 
 
 def test_causal_history_encoder_does_not_use_later_frames(config, dataset):
-    model = ActionDiT(config)
+    model = create_model(config)
     batch = default_collate([dataset[-1]])
     before = model.encoder(batch).tokens[:, 2:7].detach()
     batch['history'][:, 5:] += 100

@@ -6,7 +6,7 @@ from pathlib import Path
 import torch
 
 from feedingrobot.data.episodes import write_json
-from feedingrobot.policies.audit import checkpoint_check, parent_check, read_json, sha256
+from feedingrobot.policies.audit import checkpoint_check, parent_check, sha256
 from feedingrobot.policies.models import MODEL_NAMES, check_normalization, create_model, model_name
 from feedingrobot.policies.corpus import correction_check
 from feedingrobot.policies.evaluation import evaluate
@@ -18,20 +18,6 @@ def evaluate_checkpoint(path, split, output, device='cuda', headless=False, sele
     config = checkpoint['config']
     if selected_model is not None and selected_model != model_name(config):
         raise ValueError('Selected model and evaluation checkpoint differ')
-    from feedingrobot.data.episodes import input_hashes
-    if model_name(config) == 'MinaDiTv1' and checkpoint['source_hashes'] != input_hashes():
-        from feedingrobot.policies.legacy import run
-        if checkpoint['schema_version'] != 1:
-            raise ValueError('Historical correction forks evaluate through feedingrobot.policies.legacy and their original evaluation entry')
-        arguments = ['--checkpoint', str(Path(path).resolve()), '--split', split,
-                     '--output', str(Path(output).resolve()), '--device', device]
-        if headless:
-            arguments.append('--headless')
-        code = run('feedingrobot.scripts.eval_dp', arguments, expected=checkpoint['source_hashes'])
-        report_path = Path(output) / 'report.json'
-        if code not in (0, 1) or not report_path.exists():
-            raise RuntimeError('Historical evaluation failed')
-        return read_json(report_path)
     device, hardware = setup(config, device)
     parent = parent_check(config)
     checkpoint_check(checkpoint, config, parent)

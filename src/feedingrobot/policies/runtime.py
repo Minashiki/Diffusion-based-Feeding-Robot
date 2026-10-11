@@ -42,19 +42,23 @@ def setup(config, device='cuda'):
                 gpu=torch.cuda.get_device_name(device) if device.type == 'cuda' else None,
                 cpu_affinity=sorted(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else None,
                 torch_threads=torch.get_num_threads(), interop_threads=torch.get_num_interop_threads())
-    if config['model'].get('name') == 'MinaDiTV3':
+    if config['model'].get('name') in ('MinaDiTV4', 'MinaDiTV5'):
         info['inference_precision'] = 'fp32_ieee'
+    if config['training'].get('precision') == 'fp32':
+        info['training_precision'] = 'fp32_ieee'
     return device, info
 
 
-def precision(device):
+def precision(device, config=None):
+    if config and config['training'].get('precision') == 'fp32':
+        return inference_precision(device, config)
     return (torch.autocast('cuda', dtype=torch.bfloat16)
             if device.type == 'cuda' and torch.cuda.is_bf16_supported() else contextlib.nullcontext())
 
 
 @contextlib.contextmanager
 def inference_precision(device, config):
-    if config['model'].get('name') != 'MinaDiTV3':
+    if config['model'].get('name') not in ('MinaDiTV4', 'MinaDiTV5'):
         yield
         return
     backends = (torch.backends.cuda.matmul, torch.backends.cudnn, torch.backends.cudnn.conv)

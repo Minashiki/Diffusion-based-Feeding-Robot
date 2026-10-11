@@ -1,6 +1,7 @@
 """Small M5 engineering validation, or trained-policy acceptance and freezing."""
 
 import argparse
+import contextlib
 from pathlib import Path
 
 import numpy as np
@@ -9,11 +10,11 @@ from torch.utils.data import default_collate
 
 from feedingrobot.data.episodes import input_hashes, write_json
 from feedingrobot.policies.audit import parent_check, sha256
-from feedingrobot.policies.data import fit_normalization
 from feedingrobot.policies.dit import noise_loss, sample_actions, schedulers
-from feedingrobot.policies.corpus import TrainingWindows, correction_check
+from feedingrobot.policies.dp_normalizer import fit_dp_limits
+from feedingrobot.policies.corpus import TrainingWindows, correction_check, start_pose_check
 from feedingrobot.policies.models import MODEL_NAMES, check_normalization, create_model, model_name, resolve_config
-from feedingrobot.policies.normalization import fit_minmax, no_normalization
+from feedingrobot.policies.normalization import fit_limits
 from feedingrobot.policies.evaluation import run_policy
 from feedingrobot.policies.runtime import precision, rng_state, save_checkpoint, setup, to_device
 
@@ -26,12 +27,16 @@ def engineering(config, output, device='cuda', updates=200):
     parent = parent_check(config)
     print('Building legal train windows and model input representation...', flush=True)
     correction = correction_check(config)
-    dataset = TrainingWindows(config, correction)
-    normalization = (no_normalization(dataset) if model_name(config) == 'MinaDiTV3' else
-                     fit_minmax(dataset) if model_name(config) == 'MinaDiTV2' else fit_normalization(dataset.base))
-    if model_name(config) in ('MinaDiTV2', 'MinaDiTV3'):
-        normalization['source_binding'] = dict(m4_dataset_binding=parent['dataset_binding'],
-                                               correction_report_sha256=correction['report_sha256'] if correction else None)
+    extension = start_pose_check(config)
+    dataset = TrainingWindows(config, correction, extension=extension)
+    normalization = (fit_dp_limits(dataset) if model_name(config) == 'MinaDiTV5' else
+                     fit_limits(dataset))
+    if model_name(config) == 'MinaDiTV4':
+        normalization['observation_timing'] = 'pre_action'
+    normalization['source_binding'] = dict(m4_dataset_binding=parent['dataset_binding'],
+                                           correction_report_sha256=correction['report_sha256'] if correction else None)
+    if extension:
+        normalization['source_binding']['train_extension_report_sha256'] = extension['report_sha256']
     check_normalization(config, normalization)
     dataset.set_normalization(normalization)
     rng = np.random.default_rng(config['training']['seed'])
@@ -45,11 +50,12 @@ def engineering(config, output, device='cuda', updates=200):
     losses = []
     for step in range(updates):
         optimizer.zero_grad(set_to_none=True)
-        with precision(device):
+        with precision(device, config):
             loss = noise_loss(model, scheduler, batch, noise=noise, timesteps=steps)
         if not torch.isfinite(loss):
             raise FloatingPointError('Nonfinite diagnostic loss')
-        loss.backward()
+        with precision(device, config) if config['training'].get('precision') == 'fp32' else contextlib.nullcontext():
+            loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1., error_if_nonfinite=True)
         optimizer.step()
         losses.append(float(loss.detach()))
@@ -66,7 +72,7 @@ def engineering(config, output, device='cuda', updates=200):
     passed = updates >= 20 and final <= initial * .5
     state = model.state_dict()
     checkpoint = dict(schema_version=1, diagnostic=True, config=config, parent=parent, source_hashes=input_hashes(),
-                      model_name=model_name(config), correction=correction,
+                      model_name=model_name(config), correction=correction, train_extension=extension,
                       normalization=normalization, model=state, ema=state, optimizer=optimizer.state_dict(),
                       step=updates, best_score=-1., rng=rng_state(rng), hardware=hardware)
     save_checkpoint(output / 'diagnostic.pt', checkpoint)

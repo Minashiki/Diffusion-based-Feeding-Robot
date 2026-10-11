@@ -1,6 +1,7 @@
 """EMA diffusion training and checkpointing with exact phase sampler resume."""
 
 import copy
+import contextlib
 import json
 from pathlib import Path
 
@@ -10,11 +11,12 @@ from torch.utils.data import DataLoader, default_collate
 
 from feedingrobot.data.episodes import input_hashes, write_json
 from feedingrobot.policies.audit import checkpoint_check, parent_check
-from feedingrobot.policies.data import ActionWindows, fit_normalization
+from feedingrobot.policies.data import ActionWindows
 from feedingrobot.policies.dit import noise_loss, schedulers
+from feedingrobot.policies.dp_normalizer import fit_dp_limits
 from feedingrobot.policies.corpus import TrainingWindows, correction_check, start_pose_check
 from feedingrobot.policies.models import check_normalization, create_model, model_name
-from feedingrobot.policies.normalization import fit_minmax, no_normalization, update_ranges
+from feedingrobot.policies.normalization import denormalize_actions, fit_limits
 from feedingrobot.policies.runtime import precision, restore_rng, rng_state, save_checkpoint, setup, to_device
 from feedingrobot.sim.model import ROOT
 
@@ -40,7 +42,7 @@ def update_ema(ema, model, decay):
 
 
 @torch.no_grad()
-def validation_loss(model, dataset, scheduler, config, device, range_report=None):
+def validation_loss(model, dataset, scheduler, config, device):
     # Fixed validation noise/samples; this must not consume training RNG state.
     rng = np.random.default_rng(123)
     generator = torch.Generator(device=device).manual_seed(123)
@@ -49,13 +51,51 @@ def validation_loss(model, dataset, scheduler, config, device, range_report=None
     for _ in range(config['training']['validation_batches']):
         indices = dataset.sample_indices(rng, config['training']['batch_size'])
         batch = to_device(default_collate([dataset[i] for i in indices]), device)
-        if range_report is not None:
-            update_ranges(batch, range_report)
         noise = torch.randn(batch['actions'].shape, device=device, generator=generator)
         steps = torch.randint(scheduler.config.num_train_timesteps, (len(indices),), device=device, generator=generator)
-        with precision(device):
+        with precision(device, config):
             total += float(noise_loss(model, scheduler, batch, noise=noise, timesteps=steps))
     return total / config['training']['validation_batches']
+
+
+@torch.no_grad()
+def validation_actions(model, dataset, config, normalization, device):
+    """Fixed expert observations; score physical sampled actions before control clipping."""
+    from feedingrobot.policies.dit import sample_actions
+    from feedingrobot.sim.model import load_json
+    count = config['training']['validation_action_samples']
+    rng = np.random.default_rng(123)
+    first = {}
+    for index, (episode, _, _, _) in enumerate(dataset.windows):
+        first.setdefault(episode, index)
+    starts = [first[episode] for episode in rng.permutation(list(first))[:max(1, count//2)]]
+    indices = starts + dataset.sample_indices(rng, count-len(starts))
+    batch = to_device(default_collate([dataset[i] for i in indices]), device)
+    model.eval()
+    prediction = sample_actions(model, config, batch, normalization, torch.Generator(device=device).manual_seed(123))
+    if not torch.isfinite(prediction).all():
+        raise FloatingPointError('Nonfinite sampled validation actions')
+    truth = denormalize_actions(batch['actions'], normalization)
+    robot = load_json(f'configs/robots/{config["robot_id"]}.json')
+    result = {}
+    for name in ('episode_start', 'first_action', 'first_four', 'legal_horizon'):
+        mask = batch['action_mask'].clone()
+        if name == 'episode_start':
+            mask[len(starts):] = False
+            mask[:, 1:] = False
+        elif name == 'first_action':
+            mask[:, 1:] = False
+        elif name == 'first_four':
+            mask[:, 4:] = False
+        metrics = dict(actions=int(mask.sum()))
+        for field, columns in (('linear', slice(0, 3)), ('angular', slice(3, 6))):
+            error = (prediction[..., columns] - truth[..., columns])[mask]
+            speed = prediction[..., columns][mask].norm(dim=-1)
+            metrics[field] = dict(vector_rmse=float(error.square().sum(-1).mean().sqrt()),
+                                 zero_action_vector_rmse=float(truth[..., columns][mask].square().sum(-1).mean().sqrt()),
+                                 over_limit_fraction=float((speed > robot[f'{field}_speed_limit']).float().mean()))
+        result[name] = metrics
+    return result
 
 
 def train(config, output, *, device='cuda', resume=None, updates=None, headless=False):
@@ -82,9 +122,11 @@ def train(config, output, *, device='cuda', resume=None, updates=None, headless=
         output.mkdir(parents=True, exist_ok=False)
     raw = TrainingWindows(config, correction, extension=extension)
     normalization = (checkpoint['normalization'] if checkpoint else
-                     no_normalization(raw) if model_name(config) == 'MinaDiTV3' else
-                     fit_minmax(raw) if model_name(config) == 'MinaDiTV2' else fit_normalization(raw.base))
-    if not checkpoint and model_name(config) in ('MinaDiTV2', 'MinaDiTV3'):
+                     fit_dp_limits(raw) if model_name(config) == 'MinaDiTV5' else
+                     fit_limits(raw))
+    if not checkpoint and model_name(config) == 'MinaDiTV4':
+        normalization['observation_timing'] = 'pre_action'
+    if not checkpoint:
         normalization['source_binding'] = dict(m4_dataset_binding=parent['dataset_binding'],
                                                correction_report_sha256=correction['report_sha256'] if correction else None)
         if extension:
@@ -140,21 +182,21 @@ def train(config, output, *, device='cuda', resume=None, updates=None, headless=
             batch = to_device(batch, device)
             model.train()
             optimizer.zero_grad(set_to_none=True)
-            with precision(device):
+            with precision(device, config):
                 loss = noise_loss(model, scheduler, batch)
             if not torch.isfinite(loss):
                 raise FloatingPointError('Nonfinite diffusion loss')
-            loss.backward()
+            with precision(device, config) if settings.get('precision') == 'fp32' else contextlib.nullcontext():
+                loss.backward()
             norm = torch.nn.utils.clip_grad_norm_(model.parameters(), settings['gradient_clip'], error_if_nonfinite=True)
             optimizer.step()
             update_ema(ema, model, settings['ema_decay'])
             step += 1
             record = dict(step=step, loss=float(loss.detach()), gradient_norm=float(norm))
             if step % settings['validation_every'] == 0:
-                ranges = {} if model_name(config) == 'MinaDiTV2' else None
-                record['validation_loss'] = validation_loss(ema, validation, scheduler, config, device, ranges)
-                if ranges is not None:
-                    record['validation_input_range'] = ranges
+                record['validation_loss'] = validation_loss(ema, validation, scheduler, config, device)
+                if settings.get('validation_action_samples'):
+                    record['validation_actions'] = validation_actions(ema, validation, config, normalization, device)
             if step % settings['evaluation_every'] == 0:
                 from feedingrobot.policies.evaluation import evaluate
                 report = evaluate(ema, config, normalization, device, 'validation', output / f'validation_{step}', viewer=not headless)

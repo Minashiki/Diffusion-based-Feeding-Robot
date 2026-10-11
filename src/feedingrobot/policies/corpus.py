@@ -15,8 +15,8 @@ def start_pose_check(config):
     """Bind the completed normal extension without rewriting its collection evidence."""
     if not config.get('train_extension_report'):
         return None
-    if config.get('correction_report') or config['model'].get('name') not in ('MinaDiTV2', 'MinaDiTV3'):
-        raise ValueError('Start-pose mixing requires MinaDiTV2 or MinaDiTV3 without correction data')
+    if config.get('correction_report') or config['model'].get('name') not in ('MinaDiTV4', 'MinaDiTV5'):
+        raise ValueError('Start-pose mixing requires V4 or V5 without correction data')
     path = ROOT / config['train_extension_report']
     report = read_json(path)
     directory = Path(report['dataset'])
@@ -125,9 +125,15 @@ class TrainingWindows(Dataset):
             self.lookup = {index: len(self.base)+i for i, index in enumerate(self.indices)}
 
     def set_normalization(self, normalization):
+        timing_changed = ((self.normalization or {}).get('observation_timing')
+                          != normalization.get('observation_timing'))
         self.normalization = self.base.normalization = normalization
+        if timing_changed:
+            self.base.cache.clear()
         if self.extension:
             self.extension.normalization = normalization
+            if timing_changed:
+                self.extension.cache.clear()
         if self.extra:
             self.extra.normalization = normalization
 

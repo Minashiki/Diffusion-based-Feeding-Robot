@@ -129,8 +129,10 @@ class ActionDiT(nn.Module):
 
 def schedulers(config):
     settings = dict(num_train_timesteps=config['diffusion']['train_steps'],
-                    beta_schedule=config['diffusion']['beta_schedule'], prediction_type='epsilon',
-                    clip_sample=False, timestep_spacing=config['diffusion'].get('timestep_spacing', 'trailing'))
+                    beta_schedule=config['diffusion']['beta_schedule'],
+                    prediction_type=config['diffusion'].get('prediction_type', 'epsilon'),
+                    clip_sample=config['diffusion'].get('clip_sample', False),
+                    timestep_spacing=config['diffusion'].get('timestep_spacing', 'trailing'))
     return DDPMScheduler(**settings), DDIMScheduler(**settings)
 
 
@@ -141,7 +143,13 @@ def noise_loss(model, scheduler, batch, *, noise=None, timesteps=None):
                  if timesteps is None else timesteps)
     noisy = scheduler.add_noise(actions, noise, timesteps) * mask[..., None]
     predicted = model.denoiser(noisy, timesteps, model.encoder(batch), mask)
-    return ((predicted.float() - noise.float()).square() * mask[..., None]).sum() / (mask.sum() * 6)
+    if scheduler.config.prediction_type == 'epsilon':
+        target = noise
+    elif scheduler.config.prediction_type == 'sample':
+        target = actions
+    else:
+        raise ValueError('Training supports epsilon or sample prediction')
+    return ((predicted.float() - target.float()).square() * mask[..., None]).sum() / (mask.sum() * 6)
 
 
 @torch.no_grad()
